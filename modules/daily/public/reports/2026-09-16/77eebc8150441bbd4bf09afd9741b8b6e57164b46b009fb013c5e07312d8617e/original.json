@@ -1,0 +1,425 @@
+{
+  "report_id": "2026-09-16-AM-late-v1",
+  "edition": "早报补刊·午间采集（非07:45快照）",
+  "report_date": "2026-09-16",
+  "timezone": "Asia/Shanghai",
+  "cutoff_at": "2026-09-16T04:39:47.283456Z",
+  "title": "宽基与半导体分化，政策窗口仍待核验",
+  "summary": "本期按午间实际取证补发：美股9月15日宽基收跌而半导体ETF相对偏强，能源ETF上涨；亚洲数据时点不齐。仅覆盖实际取得的行情与官方日历，不能视为完整早间新闻扫描或07:45历史回放。",
+  "objects": [
+    {
+      "id": "DO-01",
+      "title": "美股宽基收跌，半导体ETF相对偏强",
+      "fact": "本次供应商9月15日常规交易时段快照：SPY -0.46%、QQQ -0.65%、IWM -0.70%、SOXX +0.36%，均按本响应last_done/prev_close计算。",
+      "signal": "宽基与半导体ETF方向分化；SOXX是ETF代理，不是费城半导体指数点位。",
+      "inference": "只确认这组价格表现，未核验成分贡献、公司公告或行业盈利变化。",
+      "decision": "补充成分与成交宽度后再判断是否为行业扩散；本期不提交叙事状态。",
+      "invalidation": "若价格相对强弱不持续或公司证据不支持，不能外推中期产业结论。",
+      "sources": [
+        "S1"
+      ],
+      "asset": "跨资产观察",
+      "verification": "VERIFIED",
+      "importance": 3
+    },
+    {
+      "id": "DO-02",
+      "title": "能源ETF上涨，通胀叙事仍需实际数据验证",
+      "fact": "同一供应商常规时段数据：USO +3.32%、GLD +0.33%、TLT -0.27%。",
+      "signal": "能源代理上涨与长债ETF下跌同时出现。",
+      "inference": "ETF表现不能直接等同原油现货、国债收益率或通胀预期，也不能据此断言通胀下行结束。",
+      "decision": "继续观察核心通胀、信用利差与融资需求；当前缺少最新宏观发布和产业成本证据。",
+      "invalidation": "若后续价格回落或核心通胀证据相反，保留分歧，不倒填因果。",
+      "sources": [
+        "S1"
+      ],
+      "asset": "跨资产观察",
+      "verification": "VERIFIED",
+      "importance": 3
+    },
+    {
+      "id": "DO-03",
+      "title": "亚洲快照为午间数据，不能回填早盘判断",
+      "fact": "沪深300返回4479.55，时间2026-09-16 03:33:31 UTC；恒生指数24697.350，时间04:37:14 UTC。两条时间不一致，沪深300距本次采集超过一小时。",
+      "signal": "保留来源字段，但不作为同步当前行情比较；午间市场状态与供应商延迟未独立核验。",
+      "inference": "本期无法由指数快照确认消费复苏、风格扩散或当日市场宽度。",
+      "decision": "等待同窗口有效数据和消费行业/公司证据，缺失不填零。",
+      "invalidation": "若无法确认快照交易时段和新鲜度，排除其当前价格阈值判断。",
+      "sources": [
+        "S1"
+      ],
+      "asset": "跨资产观察",
+      "verification": "VERIFIED",
+      "importance": 3
+    },
+    {
+      "id": "DO-04",
+      "title": "FOMC仍是待观察事件",
+      "fact": "本次读取的美联储官方会议日历列示2026年9月15—16日会议，星号表示关联经济预测摘要；页面未列本次声明链接。",
+      "signal": "会议结果和预测材料待正式披露，本期不填入未核实决议或市场概率。",
+      "inference": "日历只证明计划安排，不证明政策方向。",
+      "decision": "Today Risk Map：后续核对官方声明与预测，再观察利率、风险资产和信用反馈；市场共识预期本期不可得。",
+      "invalidation": "若日历更新或正式材料与预期不同，记录变化并保持事前和事后判断分离。",
+      "sources": [
+        "S2"
+      ],
+      "asset": "跨资产观察",
+      "verification": "VERIFIED",
+      "importance": 3
+    }
+  ],
+  "top_ids": [
+    "DO-01",
+    "DO-02",
+    "DO-03",
+    "DO-04"
+  ],
+  "sources": [
+    {
+      "id": "S1",
+      "title": "Longbridge本次实际行情响应；原始证据内嵌",
+      "url": null,
+      "tier": "S1",
+      "retrieved_at": "2026-09-16T04:39:47.283456Z",
+      "snapshot_hash": "83b28773eae60994d984826fed745a9ddd85caebb48738b6df071714577e8885"
+    },
+    {
+      "id": "S2",
+      "title": "美联储FOMC官方会议日历",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "tier": "S0",
+      "retrieved_at": "2026-09-16T04:39:47.283456Z",
+      "snapshot_hash": "bef5c8a74d89609dc0d0a4917fc7aaa47177b6c06a3050e65e13c01143aeac66"
+    }
+  ],
+  "quotes": [
+    {
+      "symbol": "SPY.US",
+      "last_done": "757.390",
+      "prev_close": "760.880",
+      "open": "760.117",
+      "high": "760.350",
+      "low": "756.150",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 46194964,
+      "turnover": "35022330476.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "758.225",
+        "timestamp": "2026-09-15T23:59:53Z",
+        "volume": 7339961,
+        "turnover": "5559465075.037",
+        "high": "758.380",
+        "low": "757.390",
+        "prev_close": "757.390"
+      },
+      "overnight": {
+        "last_done": "758.590",
+        "timestamp": "2026-09-16T04:37:00Z",
+        "volume": 37758,
+        "turnover": "28641001.140",
+        "high": "759.600",
+        "low": "757.680",
+        "prev_close": "757.390"
+      },
+      "pre_market": {
+        "last_done": "760.120",
+        "timestamp": "2026-09-15T13:30:01Z",
+        "volume": 310199,
+        "turnover": "235666322.355",
+        "high": "761.485",
+        "low": "756.203",
+        "prev_close": "760.880"
+      }
+    },
+    {
+      "symbol": "QQQ.US",
+      "last_done": "704.540",
+      "prev_close": "709.180",
+      "open": "708.800",
+      "high": "709.530",
+      "low": "703.635",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 26631661,
+      "turnover": "18801418355.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "705.190",
+        "timestamp": "2026-09-15T23:59:45Z",
+        "volume": 1029936,
+        "turnover": "727823509.017",
+        "high": "705.565",
+        "low": "704.540",
+        "prev_close": "704.540"
+      },
+      "overnight": {
+        "last_done": "705.960",
+        "timestamp": "2026-09-16T04:36:58Z",
+        "volume": 86952,
+        "turnover": "61345918.350",
+        "high": "707.220",
+        "low": "704.170",
+        "prev_close": "704.540"
+      },
+      "pre_market": {
+        "last_done": "708.590",
+        "timestamp": "2026-09-15T13:30:00Z",
+        "volume": 539600,
+        "turnover": "381947366.448",
+        "high": "710.280",
+        "low": "704.150",
+        "prev_close": "709.180"
+      }
+    },
+    {
+      "symbol": "IWM.US",
+      "last_done": "285.140",
+      "prev_close": "287.160",
+      "open": "286.620",
+      "high": "286.930",
+      "low": "284.080",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 25300508,
+      "turnover": "7219541801.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "285.419",
+        "timestamp": "2026-09-15T23:59:30Z",
+        "volume": 412187,
+        "turnover": "117554173.691",
+        "high": "285.500",
+        "low": "284.998",
+        "prev_close": "285.140"
+      },
+      "overnight": {
+        "last_done": "285.710",
+        "timestamp": "2026-09-16T04:27:52Z",
+        "volume": 14883,
+        "turnover": "4250227.430",
+        "high": "285.980",
+        "low": "285.160",
+        "prev_close": "285.140"
+      },
+      "pre_market": {
+        "last_done": "286.570",
+        "timestamp": "2026-09-15T13:30:00Z",
+        "volume": 170231,
+        "turnover": "48782737.084",
+        "high": "287.270",
+        "low": "284.889",
+        "prev_close": "287.160"
+      }
+    },
+    {
+      "symbol": "SOXX.US",
+      "last_done": "498.850",
+      "prev_close": "497.075",
+      "open": "502.550",
+      "high": "504.740",
+      "low": "496.580",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 6014198,
+      "turnover": "3005157767.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "499.030",
+        "timestamp": "2026-09-15T23:59:33Z",
+        "volume": 90878,
+        "turnover": "45318770.973",
+        "high": "499.833",
+        "low": "498.408",
+        "prev_close": "498.850"
+      },
+      "overnight": {
+        "last_done": "501.220",
+        "timestamp": "2026-09-16T04:36:27Z",
+        "volume": 16577,
+        "turnover": "8290350.160",
+        "high": "502.650",
+        "low": "497.500",
+        "prev_close": "498.850"
+      },
+      "pre_market": {
+        "last_done": "502.850",
+        "timestamp": "2026-09-15T13:30:00Z",
+        "volume": 173810,
+        "turnover": "86989115.374",
+        "high": "503.440",
+        "low": "494.520",
+        "prev_close": "497.075"
+      }
+    },
+    {
+      "symbol": "GLD.US",
+      "last_done": "394.150",
+      "prev_close": "392.840",
+      "open": "393.110",
+      "high": "395.310",
+      "low": "391.810",
+      "timestamp": "2026-09-15T19:59:58Z",
+      "volume": 6705452,
+      "turnover": "2639348569.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "392.640",
+        "timestamp": "2026-09-15T23:59:56Z",
+        "volume": 61950,
+        "turnover": "24415349.958",
+        "high": "394.643",
+        "low": "392.500",
+        "prev_close": "394.150"
+      },
+      "overnight": {
+        "last_done": "396.520",
+        "timestamp": "2026-09-16T04:36:57Z",
+        "volume": 39564,
+        "turnover": "15666816.840",
+        "high": "398.000",
+        "low": "392.150",
+        "prev_close": "394.150"
+      },
+      "pre_market": {
+        "last_done": "393.180",
+        "timestamp": "2026-09-15T13:30:00Z",
+        "volume": 124373,
+        "turnover": "48834055.903",
+        "high": "394.970",
+        "low": "390.740",
+        "prev_close": "392.840"
+      }
+    },
+    {
+      "symbol": "TLT.US",
+      "last_done": "80.710",
+      "prev_close": "80.930",
+      "open": "80.630",
+      "high": "80.845",
+      "low": "80.510",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 35032953,
+      "turnover": "2826715806.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "80.840",
+        "timestamp": "2026-09-15T23:59:48Z",
+        "volume": 903325,
+        "turnover": "72913941.806",
+        "high": "80.840",
+        "low": "80.670",
+        "prev_close": "80.710"
+      },
+      "overnight": {
+        "last_done": "80.880",
+        "timestamp": "2026-09-16T04:37:23Z",
+        "volume": 30448,
+        "turnover": "2462910.280",
+        "high": "80.990",
+        "low": "80.750",
+        "prev_close": "80.710"
+      },
+      "pre_market": {
+        "last_done": "80.630",
+        "timestamp": "2026-09-15T13:30:00Z",
+        "volume": 760825,
+        "turnover": "61326251.485",
+        "high": "80.930",
+        "low": "80.303",
+        "prev_close": "80.930"
+      }
+    },
+    {
+      "symbol": "USO.US",
+      "last_done": "161.860",
+      "prev_close": "156.660",
+      "open": "158.350",
+      "high": "163.350",
+      "low": "158.260",
+      "timestamp": "2026-09-15T20:00:00Z",
+      "volume": 6895709,
+      "turnover": "1107759729.000",
+      "trade_status": "Normal",
+      "post_market": {
+        "last_done": "161.640",
+        "timestamp": "2026-09-15T23:59:37Z",
+        "volume": 95895,
+        "turnover": "15490732.057",
+        "high": "162.220",
+        "low": "161.040",
+        "prev_close": "161.860"
+      },
+      "overnight": {
+        "last_done": "160.150",
+        "timestamp": "2026-09-16T04:36:05Z",
+        "volume": 51927,
+        "turnover": "8339795.040",
+        "high": "161.350",
+        "low": "159.720",
+        "prev_close": "161.860"
+      },
+      "pre_market": {
+        "last_done": "158.283",
+        "timestamp": "2026-09-15T13:29:27Z",
+        "volume": 277414,
+        "turnover": "43738751.984",
+        "high": "159.850",
+        "low": "156.140",
+        "prev_close": "156.660"
+      }
+    },
+    {
+      "symbol": "000300.SH",
+      "last_done": "4479.55",
+      "prev_close": "4450.04",
+      "open": "4449.88",
+      "high": "4481.19",
+      "low": "4417.60",
+      "timestamp": "2026-09-16T03:33:31Z",
+      "volume": 99436535,
+      "turnover": "300354317939.30",
+      "trade_status": "Normal",
+      "post_market": null,
+      "overnight": null,
+      "pre_market": null
+    },
+    {
+      "symbol": "HSI.HK",
+      "last_done": "24697.350",
+      "prev_close": "24667.240",
+      "open": "24789.910",
+      "high": "24789.910",
+      "low": "24574.750",
+      "timestamp": "2026-09-16T04:37:14Z",
+      "volume": 4760083864,
+      "turnover": "95652962801.643",
+      "trade_status": "Normal",
+      "post_market": null,
+      "overnight": null,
+      "pre_market": null
+    }
+  ],
+  "market_rows": [],
+  "state_update": {
+    "status": "NOT_COMMITTED",
+    "prior": "UNKNOWN",
+    "reason": "没有已提交State及完整Ledger；9月15日晚报缺报，本期不虚构Prior或复盘命中。美股收益按本次prev_close字段计算，其中IWM/SOXX该字段与前一期快照价格不同，调整原因未核验，不拼接为跨期总收益序列。"
+  },
+  "publication": {
+    "kind": "late_supplement",
+    "scheduled_at": "2026-09-16T08:00:00+08:00",
+    "original_cutoff_at": "2026-09-16T07:45:00+08:00",
+    "retrospective": true
+  },
+  "qa": {
+    "status": "DEGRADED",
+    "synthetic": false,
+    "missing": [
+      "未取得07:45完整历史可得证据；本期是午间补刊",
+      "完整新闻/公告扫描、最新中国消费及美国通胀发布未覆盖",
+      "日本指数、外汇、加密资产、信用利差未获取",
+      "亚洲时段与数据延迟未独立核实，不作同步当前行情比较",
+      "部分ETF前收盘与上期快照存在口径差异，原因未核验",
+      "9月15日晚报缺报；已提交State与Ledger不可得"
+    ],
+    "method": "实际只读MCP报价与官方网页；价格百分比由原始字段计算。保留既定9月11日渲染模板，发布校验截止/引用/哈希。未改产品代码。"
+  }
+}

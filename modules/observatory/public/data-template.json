@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "datasetLabel": "填写数据集名称",
+  "records": [
+    {
+      "metricId": "us_inflation",
+      "period": "2026-07-31",
+      "publishedAt": "2026-08-28",
+      "value": null,
+      "sourceUrl": "https://www.bea.gov/data/personal-consumption-expenditures-price-index",
+      "sourceLabel": "BEA 原始发布",
+      "sampleSize": null,
+      "notes": "将 value 替换为核验后的数值。示例日期只演示格式，请以原始发布为准。"
+    }
+  ]
+}

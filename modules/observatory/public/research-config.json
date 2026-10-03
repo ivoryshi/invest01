@@ -1,0 +1,1820 @@
+{
+  "version": "0.2.0",
+  "panels": [
+    {
+      "id": "credit",
+      "name": "信用供需",
+      "short": "钱从哪里来",
+      "question": "融资条件改善，借款意愿是否同步增强？",
+      "caution": "供给与需求必须分别确认，收紧幅度下降不等于净放松。"
+    },
+    {
+      "id": "spend",
+      "name": "支出与投入",
+      "short": "钱用到哪里",
+      "question": "新增融资形成支出，还是用于维持旧资产负债表？",
+      "caution": "资本开支可以来自内部现金；融资用途未披露时保留未知。"
+    },
+    {
+      "id": "orders",
+      "name": "订单与产能",
+      "short": "需求传到哪里",
+      "question": "订单转为交付了吗？扩产是否跑在终端需求前面？",
+      "caution": "订单、收入和库存不互相替代；上下游分别观察。"
+    },
+    {
+      "id": "cash",
+      "name": "利润与现金",
+      "short": "回报留在哪里",
+      "question": "谁获得利润与现金，谁承担应收和库存？",
+      "caution": "现金流改善要区分回款改善与延迟向供应商付款。"
+    },
+    {
+      "id": "debt",
+      "name": "偿债与损失",
+      "short": "压力何时到来",
+      "question": "2027—2028年到期、重定价与信用损失集中在哪里？",
+      "caution": "已披露债务与情景融资假设分开；不自动推定可再融资。"
+    },
+    {
+      "id": "breadth",
+      "name": "扩散与集中",
+      "short": "多少主体改善",
+      "question": "总体改善能否扩散至中位数企业和非头部群体？",
+      "caution": "观察池统计不代表全市场；头部组固定版本并标注覆盖率。"
+    }
+  ],
+  "sources": {
+    "pbc": [
+      "中国人民银行",
+      "https://www.pbc.gov.cn/",
+      "官方金融统计与贷款投向；需逐序列核对频率与可得口径"
+    ],
+    "mof": [
+      "财政部",
+      "https://www.mof.gov.cn/",
+      "财政支出与融资分列；不得直接把发债当作新增需求"
+    ],
+    "nbs": [
+      "国家统计局",
+      "https://data.stats.gov.cn/",
+      "收入消费、工业利润、库存与应收；累计和当期口径分列"
+    ],
+    "fed": [
+      "美联储 Z.1",
+      "https://www.federalreserve.gov/releases/z1/default.htm",
+      "部门融资流量和存量；不可简单将存量差等同交易流量"
+    ],
+    "sloos": [
+      "美联储 SLOOS",
+      "https://www.federalreserve.gov/data/sloos.htm",
+      "融资供给与贷款需求调查；季度"
+    ],
+    "bea": [
+      "美国 BEA",
+      "https://www.bea.gov/data",
+      "PCE、收入与投资；保留季调及修订版本"
+    ],
+    "bls": [
+      "美国 BLS",
+      "https://www.bls.gov/",
+      "CPI、工资与就业；各分项定义分别确认"
+    ],
+    "census": [
+      "美国 Census M3",
+      "https://www.census.gov/manufacturing/m3/currentdata.html",
+      "制造业订单、出货、库存；行业与季调口径固定"
+    ],
+    "nyfed": [
+      "纽约联储",
+      "https://www.newyorkfed.org/microeconomics/hhdc",
+      "居民债务及逾期；群体维度随原始披露"
+    ],
+    "filing": [
+      "公司正式披露",
+      "https://www.sec.gov/edgar/search/",
+      "SEC、交易所及公司IR原始文件；公司链接在导入时逐条提供"
+    ],
+    "calc": [
+      "固定观察池计算",
+      null,
+      "由已核实公司数据计算；保留样本、规则与头部组版本"
+    ],
+    "quote": [
+      "授权行情供应商",
+      null,
+      "尚未连接账户；指数代码、总收益与价格收益映射待核验"
+    ],
+    "dol": [
+      "美国劳工部",
+      "https://www.dol.gov/ui/data.pdf",
+      "初请失业保险，注意季调、修订和节假日。"
+    ]
+  },
+  "metrics": [
+    {
+      "id": "cn_credit",
+      "name": "非政府债券社融增速",
+      "panel": "credit",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "pbc",
+      "formula": "社融存量扣除政府债券后，按同口径计算同比；不等于民营信用。",
+      "meaning": "政府融资之外的信用是否改善？"
+    },
+    {
+      "id": "cn_house_credit",
+      "name": "住户贷款余额增速",
+      "panel": "credit",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "pbc",
+      "formula": "住户贷款余额同比；经营贷、消费贷与住房贷款另行下钻。",
+      "meaning": "居民是否扩张资产负债表？"
+    },
+    {
+      "id": "us_standards",
+      "name": "工商贷款净收紧比例",
+      "panel": "credit",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "sloos",
+      "formula": "SLOOS大型及中型企业工商贷款标准净收紧比例。正值表示净收紧。",
+      "meaning": "信贷供给是否仍在收紧？"
+    },
+    {
+      "id": "us_demand",
+      "name": "工商贷款净需求增强比例",
+      "panel": "credit",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "sloos",
+      "formula": "同组企业贷款需求净增强比例；与供给调查分开展示。",
+      "meaning": "融资需求是否自主恢复？"
+    },
+    {
+      "id": "cn_fiscal",
+      "name": "一般公共预算支出增速",
+      "panel": "spend",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "mof",
+      "formula": "官方累计支出同比；与政府性基金预算分列，不相加制造单一财政脉冲。",
+      "meaning": "融资是否转成支出？"
+    },
+    {
+      "id": "cn_consumption",
+      "name": "居民实际消费支出增速",
+      "panel": "spend",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "nbs",
+      "formula": "居民人均消费支出实际累计同比；同季可比。",
+      "meaning": "收入和信用是否传向最终需求？"
+    },
+    {
+      "id": "cn_income",
+      "name": "居民实际收入增速",
+      "panel": "spend",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "nbs",
+      "formula": "居民人均可支配收入实际累计同比。",
+      "meaning": "消费能力是否具有收入支撑？"
+    },
+    {
+      "id": "cn_retail",
+      "name": "社零当期同比",
+      "panel": "spend",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "社会消费品零售总额名义同比；1—2月合并观察，不等于全部消费。",
+      "meaning": "商品消费是否形成当期确认？"
+    },
+    {
+      "id": "us_capex",
+      "name": "核心资本品出货增速",
+      "panel": "spend",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "census",
+      "formula": "非国防资本品剔除飞机出货额同比；名义值。",
+      "meaning": "一般企业投资是否跟随龙头扩张？"
+    },
+    {
+      "id": "us_pce",
+      "name": "实际PCE同比",
+      "panel": "spend",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bea",
+      "formula": "实际个人消费支出同比，采用一致版本。",
+      "meaning": "去通胀是否仍伴随需求韧性？"
+    },
+    {
+      "id": "us_inflation",
+      "name": "核心PCE三个月年化",
+      "panel": "spend",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bea",
+      "formula": "以季调价格指数计算：(本月指数/三个月前指数)^4−1，再乘100。",
+      "meaning": "近期通胀速度是否下降？不预先认定方向。"
+    },
+    {
+      "id": "cn_inventory",
+      "name": "产成品库存周转天数",
+      "panel": "orders",
+      "market": "CN",
+      "unit": "天",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "规模以上工业企业官方周转天数，保留统计范围。",
+      "meaning": "生产是否快于需求？"
+    },
+    {
+      "id": "cn_orders",
+      "name": "制造业PMI新订单",
+      "panel": "orders",
+      "market": "CN",
+      "unit": "点",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "官方制造业PMI新订单分项；扩散指数，不是订单金额。",
+      "meaning": "订单改善是否开始扩散？"
+    },
+    {
+      "id": "us_orders",
+      "name": "核心资本品订单增速",
+      "panel": "orders",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "census",
+      "formula": "非国防资本品剔除飞机新订单额同比；名义值。",
+      "meaning": "设备投资需求是否具有延续性？"
+    },
+    {
+      "id": "us_inventory",
+      "name": "制造业库存销售比",
+      "panel": "orders",
+      "market": "US",
+      "unit": "倍",
+      "freq": "月",
+      "source": "census",
+      "formula": "相同范围的季调制造业库存/当月出货额。",
+      "meaning": "库存相对出货是否堆积？"
+    },
+    {
+      "id": "cn_receivable",
+      "name": "工业应收回收期",
+      "panel": "cash",
+      "market": "CN",
+      "unit": "天",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "规模以上工业企业应收账款平均回收期。",
+      "meaning": "企业是否在为客户垫资？"
+    },
+    {
+      "id": "cn_margin",
+      "name": "工业营业收入利润率",
+      "panel": "cash",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "官方利润总额/营业收入，累计口径；非上市公司营业利润率。",
+      "meaning": "中观利润是否兑现？"
+    },
+    {
+      "id": "cn_ocf",
+      "name": "观察池现金流率中位数",
+      "panel": "cash",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定CN非金融样本企业TTM经营现金流/收入的中位数。",
+      "meaning": "典型企业有没有拿到现金？"
+    },
+    {
+      "id": "us_ocf",
+      "name": "观察池现金流率中位数",
+      "panel": "cash",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定US非金融样本企业TTM经营现金流/收入的中位数。",
+      "meaning": "利润与现金是否一致？"
+    },
+    {
+      "id": "cn_coverage",
+      "name": "观察池利息覆盖中位数",
+      "panel": "debt",
+      "market": "CN",
+      "unit": "倍",
+      "freq": "季",
+      "source": "calc",
+      "formula": "非金融企业TTM EBIT/利息费用；零分母及缺失排除并披露。",
+      "meaning": "典型企业的偿债缓冲如何？"
+    },
+    {
+      "id": "us_coverage",
+      "name": "观察池利息覆盖中位数",
+      "panel": "debt",
+      "market": "US",
+      "unit": "倍",
+      "freq": "季",
+      "source": "calc",
+      "formula": "非金融企业TTM EBIT/利息费用，保留负值与有效样本。",
+      "meaning": "融资成本是否蚕食回报？"
+    },
+    {
+      "id": "us_delinquency",
+      "name": "信用卡严重逾期迁入率",
+      "panel": "debt",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "nyfed",
+      "formula": "纽约联储披露的信用卡余额迁入90天以上逾期的年化口径。",
+      "meaning": "居民信用压力是否累积？"
+    },
+    {
+      "id": "cn_breadth",
+      "name": "现金流率改善企业占比",
+      "panel": "breadth",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定CN非金融池中TTM现金流率同比改善企业/有效可比企业。",
+      "meaning": "改善是否扩散至更多企业？"
+    },
+    {
+      "id": "us_breadth",
+      "name": "现金流率改善企业占比",
+      "panel": "breadth",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定US非金融池中TTM现金流率同比改善企业/有效可比企业。",
+      "meaning": "整体改善是否具有宽度？"
+    },
+    {
+      "id": "cn_top",
+      "name": "头部组资本开支占比",
+      "panel": "breadth",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定样本与固定头部组，头部现金资本开支/全样本现金资本开支。",
+      "meaning": "投资是否进一步集中？"
+    },
+    {
+      "id": "us_top",
+      "name": "头部组资本开支占比",
+      "panel": "breadth",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "calc",
+      "formula": "固定样本与固定头部组，头部现金资本开支/全样本现金资本开支。",
+      "meaning": "大型企业与一般企业是否分化？"
+    },
+    {
+      "id": "cn_unemployment",
+      "name": "城镇调查失业率",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "官方城镇调查失业率；分年龄数据分列，不拼接不可比序列。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "cn_service",
+      "name": "服务零售额增速",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "官方累计同比；不能通过累计增速相减推算单月增速。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "cn_corecpi",
+      "name": "核心CPI同比",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "剔除食品和能源的CPI同比。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "cn_houseprice",
+      "name": "住宅价格上涨城市数",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "个",
+      "freq": "月",
+      "source": "nbs",
+      "formula": "70城二手住宅价格环比上涨城市数；口径固定。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "cn_spending_income",
+      "name": "居民消费支出/收入",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "%",
+      "freq": "季",
+      "source": "nbs",
+      "formula": "同一统计期居民人均消费支出/可支配收入，不等同全口径储蓄率。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "cn_shortcredit",
+      "name": "住户短期贷款余额增速",
+      "panel": "macro",
+      "market": "CN",
+      "unit": "%",
+      "freq": "月",
+      "source": "pbc",
+      "formula": "包含经营与消费相关贷款，不能全部归为消费贷。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_corecpi",
+      "name": "核心CPI同比",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bls",
+      "formula": "剔除食品和能源的CPI同比。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_corepceyoy",
+      "name": "核心PCE同比",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bea",
+      "formula": "剔除食品和能源的PCE价格指数同比。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_shelter",
+      "name": "CPI住房同比",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bls",
+      "formula": "CPI住房分项同比，与新租客租金口径不同。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_eci",
+      "name": "就业成本指数同比",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "季",
+      "source": "bls",
+      "formula": "固定劳动构成的工资及福利成本同比。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_unemployment",
+      "name": "失业率",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bls",
+      "formula": "官方U-3失业率；就业参与变化另行解释。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_claims",
+      "name": "初请失业金四周均值",
+      "panel": "macro",
+      "market": "US",
+      "unit": "千人",
+      "freq": "周",
+      "source": "dol",
+      "formula": "季调初请失业金人数四周移动均值，单位千人。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_expectation",
+      "name": "居民三年通胀预期",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "nyfed",
+      "formula": "纽约联储消费者预期调查三年期通胀预期中位数。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    },
+    {
+      "id": "us_real_income",
+      "name": "实际可支配收入同比",
+      "panel": "macro",
+      "market": "US",
+      "unit": "%",
+      "freq": "月",
+      "source": "bea",
+      "formula": "真实可支配个人收入同比，与实际PCE共同观察。",
+      "meaning": "检验消费、通胀及其收入就业传导，单一读数不决定方向。"
+    }
+  ],
+  "chains": [
+    {
+      "id": "A",
+      "name": "财政与项目支出",
+      "market": "CN",
+      "question": "政府融资能否形成项目支出，并传至承包商现金回收？",
+      "funding": "政府融资 · 财政支出 · 项目资金落实",
+      "nodes": [
+        [
+          "上游材料",
+          "金属、水泥价格与销量；库存"
+        ],
+        [
+          "中游设备与施工",
+          "新订单、交付、应收与合同资产"
+        ],
+        [
+          "下游项目运营",
+          "项目执行、运营收入与承包商回款"
+        ]
+      ],
+      "support": "支出执行、交付与现金回收连续改善，且非头部企业同步受益。",
+      "counter": "发债增加，但项目支出滞后、应收持续上升。",
+      "metrics": [
+        "cn_credit",
+        "cn_fiscal",
+        "cn_orders",
+        "cn_receivable",
+        "cn_breadth"
+      ]
+    },
+    {
+      "id": "B",
+      "name": "住房与耐用品",
+      "market": "CN",
+      "question": "居民资产负债表修复，能否转化为住房与耐用品自主需求？",
+      "funding": "居民收入 · 按揭与消费融资 · 住房交付",
+      "nodes": [
+        [
+          "上游建材",
+          "价格、开工与库存"
+        ],
+        [
+          "中游开发与制造",
+          "交付、库存、资本占用"
+        ],
+        [
+          "下游居民与渠道",
+          "销售、回款、折扣及偿债"
+        ]
+      ],
+      "support": "住房交付和终端销售改善，库存回落且回款增强。",
+      "counter": "补贴品类增长，但居民融资、收入和其他消费未改善。",
+      "metrics": [
+        "cn_house_credit",
+        "cn_income",
+        "cn_consumption",
+        "cn_retail",
+        "cn_inventory"
+      ]
+    },
+    {
+      "id": "C",
+      "name": "消费与渠道",
+      "market": "CN",
+      "question": "收入改善能否穿过价格竞争，最终形成利润和现金？",
+      "funding": "就业工资 · 实际收入 · 消费倾向",
+      "nodes": [
+        [
+          "上游投入",
+          "食品原料、包装价格"
+        ],
+        [
+          "中游品牌",
+          "销量、售价、促销与毛利率"
+        ],
+        [
+          "下游渠道与服务",
+          "动销、库存、账期与经营利润"
+        ]
+      ],
+      "support": "收入与消费广泛改善，品牌及渠道现金流共同增强。",
+      "counter": "销量依赖折扣，渠道库存、账期与促销负担加重。",
+      "metrics": [
+        "cn_income",
+        "cn_consumption",
+        "cn_retail",
+        "cn_margin",
+        "cn_ocf"
+      ]
+    },
+    {
+      "id": "D",
+      "name": "AI与电力资本开支",
+      "market": "GLOBAL",
+      "question": "集中投入能否形成终端回报，并扩散到非头部供应商？",
+      "funding": "客户内部现金 · 债务 · 租赁与项目融资",
+      "nodes": [
+        [
+          "上游芯片与设备",
+          "订单、产能与资本投入"
+        ],
+        [
+          "中游算力与电力",
+          "交付、库存、客户占款"
+        ],
+        [
+          "下游云与应用",
+          "利用率、变现、折旧与回报"
+        ]
+      ],
+      "support": "客户经营回报、供应商回款与非头部增长共同改善。",
+      "counter": "投入及采购承诺扩张，终端变现落后、折旧负担上升。",
+      "metrics": [
+        "us_capex",
+        "us_orders",
+        "us_ocf",
+        "us_top",
+        "cn_top"
+      ]
+    },
+    {
+      "id": "E",
+      "name": "美国一般企业与居民",
+      "market": "US",
+      "question": "通胀和融资成本下降，是否能越过再融资压力传向实体？",
+      "funding": "银行信贷 · 债券再融资 · 按揭及消费融资",
+      "nodes": [
+        [
+          "上游工业需求",
+          "原材料与核心资本品订单"
+        ],
+        [
+          "中游制造与建造",
+          "交付、成本、库存及利息费用"
+        ],
+        [
+          "下游消费与银行",
+          "销量、折扣、逾期及信用损失"
+        ]
+      ],
+      "support": "核心通胀趋缓，贷款需求和真实支出改善，逾期未扩大。",
+      "counter": "通胀下降伴随需求收缩，信用利差及逾期压力上升。",
+      "metrics": [
+        "us_inflation",
+        "us_standards",
+        "us_demand",
+        "us_pce",
+        "us_delinquency"
+      ]
+    }
+  ],
+  "companies": [
+    {
+      "id": "601138.SH",
+      "name": "工业富联",
+      "market": "CN",
+      "chain": "D",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": true
+    },
+    {
+      "id": "300308.SZ",
+      "name": "中际旭创",
+      "market": "CN",
+      "chain": "D",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": true
+    },
+    {
+      "id": "600406.SH",
+      "name": "国电南瑞",
+      "market": "CN",
+      "chain": "A",
+      "stage": "中游",
+      "sector": "设备",
+      "anchor": true
+    },
+    {
+      "id": "600900.SH",
+      "name": "长江电力",
+      "market": "CN",
+      "chain": "A",
+      "stage": "下游",
+      "sector": "运营",
+      "anchor": true
+    },
+    {
+      "id": "600519.SH",
+      "name": "贵州茅台",
+      "market": "CN",
+      "chain": "C",
+      "stage": "中游",
+      "sector": "消费",
+      "anchor": true
+    },
+    {
+      "id": "000333.SZ",
+      "name": "美的集团",
+      "market": "CN",
+      "chain": "B",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": true
+    },
+    {
+      "id": "601899.SH",
+      "name": "紫金矿业",
+      "market": "CN",
+      "chain": "A",
+      "stage": "上游",
+      "sector": "资源",
+      "anchor": true
+    },
+    {
+      "id": "600036.SH",
+      "name": "招商银行",
+      "market": "CN",
+      "chain": "B",
+      "stage": "金融",
+      "sector": "银行",
+      "anchor": true
+    },
+    {
+      "id": "00700.HK",
+      "name": "腾讯控股",
+      "market": "HK",
+      "chain": "C",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": true
+    },
+    {
+      "id": "09988.HK",
+      "name": "阿里巴巴",
+      "market": "HK",
+      "chain": "C",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": true
+    },
+    {
+      "id": "03690.HK",
+      "name": "美团",
+      "market": "HK",
+      "chain": "C",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": true
+    },
+    {
+      "id": "01810.HK",
+      "name": "小米集团",
+      "market": "HK",
+      "chain": "B",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": true
+    },
+    {
+      "id": "00941.HK",
+      "name": "中国移动",
+      "market": "HK",
+      "chain": "D",
+      "stage": "下游",
+      "sector": "运营",
+      "anchor": true
+    },
+    {
+      "id": "00883.HK",
+      "name": "中国海洋石油",
+      "market": "HK",
+      "chain": "A",
+      "stage": "上游",
+      "sector": "资源",
+      "anchor": true
+    },
+    {
+      "id": "01088.HK",
+      "name": "中国神华",
+      "market": "HK",
+      "chain": "A",
+      "stage": "上游",
+      "sector": "资源",
+      "anchor": true
+    },
+    {
+      "id": "00388.HK",
+      "name": "香港交易所",
+      "market": "HK",
+      "chain": "E",
+      "stage": "金融",
+      "sector": "交易所",
+      "anchor": true
+    },
+    {
+      "id": "MSFT",
+      "name": "微软",
+      "market": "US",
+      "chain": "D",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": true
+    },
+    {
+      "id": "AMZN",
+      "name": "亚马逊",
+      "market": "US",
+      "chain": "D",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": true
+    },
+    {
+      "id": "NVDA",
+      "name": "英伟达",
+      "market": "US",
+      "chain": "D",
+      "stage": "中游",
+      "sector": "芯片",
+      "anchor": true
+    },
+    {
+      "id": "AVGO",
+      "name": "博通",
+      "market": "US",
+      "chain": "D",
+      "stage": "中游",
+      "sector": "芯片",
+      "anchor": true
+    },
+    {
+      "id": "ETN",
+      "name": "伊顿",
+      "market": "US",
+      "chain": "D",
+      "stage": "中游",
+      "sector": "设备",
+      "anchor": true
+    },
+    {
+      "id": "JPM",
+      "name": "摩根大通",
+      "market": "US",
+      "chain": "E",
+      "stage": "金融",
+      "sector": "银行",
+      "anchor": true
+    },
+    {
+      "id": "COST",
+      "name": "好市多",
+      "market": "US",
+      "chain": "E",
+      "stage": "下游",
+      "sector": "消费",
+      "anchor": true
+    },
+    {
+      "id": "XOM",
+      "name": "埃克森美孚",
+      "market": "US",
+      "chain": "E",
+      "stage": "上游",
+      "sector": "资源",
+      "anchor": true
+    },
+    {
+      "id": "600585.SH",
+      "name": "海螺水泥",
+      "market": "CN",
+      "chain": "A",
+      "stage": "上游",
+      "sector": "材料",
+      "anchor": false
+    },
+    {
+      "id": "600031.SH",
+      "name": "三一重工",
+      "market": "CN",
+      "chain": "A",
+      "stage": "中游",
+      "sector": "设备",
+      "anchor": false
+    },
+    {
+      "id": "601668.SH",
+      "name": "中国建筑",
+      "market": "CN",
+      "chain": "A",
+      "stage": "中游",
+      "sector": "施工",
+      "anchor": false
+    },
+    {
+      "id": "600048.SH",
+      "name": "保利发展",
+      "market": "CN",
+      "chain": "B",
+      "stage": "中游",
+      "sector": "地产",
+      "anchor": false
+    },
+    {
+      "id": "002572.SZ",
+      "name": "索菲亚",
+      "market": "CN",
+      "chain": "B",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": false
+    },
+    {
+      "id": "600887.SH",
+      "name": "伊利股份",
+      "market": "CN",
+      "chain": "C",
+      "stage": "中游",
+      "sector": "消费",
+      "anchor": false
+    },
+    {
+      "id": "603345.SH",
+      "name": "安井食品",
+      "market": "CN",
+      "chain": "C",
+      "stage": "中游",
+      "sector": "消费",
+      "anchor": false
+    },
+    {
+      "id": "GOOGL",
+      "name": "Alphabet",
+      "market": "US",
+      "chain": "D",
+      "stage": "下游",
+      "sector": "平台",
+      "anchor": false
+    },
+    {
+      "id": "TSM",
+      "name": "台积电ADR",
+      "market": "US",
+      "chain": "D",
+      "stage": "上游",
+      "sector": "芯片",
+      "anchor": false
+    },
+    {
+      "id": "CAT",
+      "name": "卡特彼勒",
+      "market": "US",
+      "chain": "E",
+      "stage": "中游",
+      "sector": "设备",
+      "anchor": false
+    },
+    {
+      "id": "DHI",
+      "name": "D.R. Horton",
+      "market": "US",
+      "chain": "E",
+      "stage": "中游",
+      "sector": "地产",
+      "anchor": false
+    },
+    {
+      "id": "GM",
+      "name": "通用汽车",
+      "market": "US",
+      "chain": "E",
+      "stage": "中游",
+      "sector": "制造",
+      "anchor": false
+    },
+    {
+      "id": "HD",
+      "name": "家得宝",
+      "market": "US",
+      "chain": "E",
+      "stage": "下游",
+      "sector": "消费",
+      "anchor": false
+    },
+    {
+      "id": "COF",
+      "name": "Capital One",
+      "market": "US",
+      "chain": "E",
+      "stage": "金融",
+      "sector": "银行",
+      "anchor": false
+    }
+  ],
+  "indices": [
+    {
+      "name": "沪深300",
+      "market": "CN",
+      "id": "000300"
+    },
+    {
+      "name": "中证500",
+      "market": "CN",
+      "id": "000905"
+    },
+    {
+      "name": "中证1000",
+      "market": "CN",
+      "id": "000852"
+    },
+    {
+      "name": "创业板指",
+      "market": "CN",
+      "id": "399006"
+    },
+    {
+      "name": "科创50",
+      "market": "CN",
+      "id": "000688"
+    },
+    {
+      "name": "中证红利",
+      "market": "CN",
+      "id": "000922"
+    },
+    {
+      "name": "恒生指数",
+      "market": "HK",
+      "id": "HSI"
+    },
+    {
+      "name": "恒生中国企业指数",
+      "market": "HK",
+      "id": "HSCEI"
+    },
+    {
+      "name": "恒生科技指数",
+      "market": "HK",
+      "id": "HSTECH"
+    },
+    {
+      "name": "标普500",
+      "market": "US",
+      "id": "SPX"
+    },
+    {
+      "name": "纳斯达克100",
+      "market": "US",
+      "id": "NDX"
+    },
+    {
+      "name": "罗素2000",
+      "market": "US",
+      "id": "RUT"
+    },
+    {
+      "name": "标普500等权重",
+      "market": "US",
+      "id": "SPXEW"
+    },
+    {
+      "name": "费城半导体指数",
+      "market": "US",
+      "id": "SOX"
+    },
+    {
+      "name": "TOPIX",
+      "market": "JP",
+      "id": "TOPIX"
+    },
+    {
+      "name": "日经225",
+      "market": "JP",
+      "id": "N225"
+    }
+  ],
+  "styles": [
+    {
+      "name": "A股大小盘",
+      "pair": "中证1000 / 沪深300",
+      "market": "CN"
+    },
+    {
+      "name": "A股成长代理",
+      "pair": "创业板指 / 沪深300",
+      "market": "CN"
+    },
+    {
+      "name": "A股红利",
+      "pair": "中证红利 / 沪深300",
+      "market": "CN"
+    },
+    {
+      "name": "港股科技代理",
+      "pair": "恒生科技 / 恒生指数",
+      "market": "HK"
+    },
+    {
+      "name": "美股大小盘",
+      "pair": "罗素2000 / 标普500",
+      "market": "US"
+    },
+    {
+      "name": "美股上涨集中度",
+      "pair": "标普500等权重 / 标普500",
+      "market": "US"
+    },
+    {
+      "name": "美股成长与价值",
+      "pair": "IWF / IWD",
+      "market": "US"
+    },
+    {
+      "name": "美股消费结构",
+      "pair": "XLY / XLP",
+      "market": "US"
+    },
+    {
+      "name": "半导体相对强弱",
+      "pair": "SOX / 纳斯达克100",
+      "market": "US"
+    },
+    {
+      "name": "日本指数结构",
+      "pair": "日经225 / TOPIX",
+      "market": "JP"
+    }
+  ],
+  "factors": [
+    {
+      "id": "P1",
+      "dimension": "量价",
+      "name": "趋势位置",
+      "formula": "收盘价相对MA20/60/200的偏离；价格调整口径必须一致。",
+      "fields": [
+        {
+          "id": "ma20",
+          "name": "距MA20",
+          "unit": "%"
+        },
+        {
+          "id": "ma60",
+          "name": "距MA60",
+          "unit": "%"
+        },
+        {
+          "id": "ma200",
+          "name": "距MA200",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "dimension": "量价",
+      "name": "成交活跃度",
+      "formula": "当日成交额/此前20日平均成交额；指数不得以ETF成交替代。",
+      "fields": [
+        {
+          "id": "volumeRatio",
+          "name": "成交额相对20日",
+          "unit": "倍"
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "dimension": "量价",
+      "name": "换手率分位",
+      "formula": "自由流通口径，过去3年历史分位，口径缺失时不计算。",
+      "fields": [
+        {
+          "id": "turnoverRank",
+          "name": "换手率分位",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "dimension": "量价",
+      "name": "高点回撤",
+      "formula": "当前价格/过去252日最高收盘价−1；非正数。",
+      "fields": [
+        {
+          "id": "drawdown",
+          "name": "距一年高点",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "P5",
+      "dimension": "量价",
+      "name": "上涨宽度",
+      "formula": "定义内成分股站上MA200的比例，必须提供样本范围与覆盖率。",
+      "fields": [
+        {
+          "id": "breadth",
+          "name": "站上MA200比例",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "F1",
+      "dimension": "基本面",
+      "name": "收入增长",
+      "formula": "最新可比季度或半年收入同比，严禁把累计同比直接相减。",
+      "fields": [
+        {
+          "id": "revenue",
+          "name": "收入同比",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "F2",
+      "dimension": "基本面",
+      "name": "利润率变化",
+      "formula": "营业利润率较上年同期变化；百分点。",
+      "fields": [
+        {
+          "id": "margin",
+          "name": "利润率同比变化",
+          "unit": "pp"
+        }
+      ]
+    },
+    {
+      "id": "F3",
+      "dimension": "基本面",
+      "name": "资本回报",
+      "formula": "非金融优先ROIC；银行使用ROE。两者标注分开。",
+      "fields": [
+        {
+          "id": "roic",
+          "name": "ROIC",
+          "unit": "%"
+        },
+        {
+          "id": "roe",
+          "name": "ROE",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "dimension": "基本面",
+      "name": "盈利现金含量",
+      "formula": "TTM经营现金流/TTM净利润；亏损、银行等不按此比率判读。",
+      "fields": [
+        {
+          "id": "cashQuality",
+          "name": "经营现金流/净利润",
+          "unit": "倍"
+        }
+      ]
+    },
+    {
+      "id": "F5",
+      "dimension": "基本面",
+      "name": "资本开支负担",
+      "formula": "TTM现金资本开支/TTM经营现金流；分母为非正数时不按常规比率判读。",
+      "fields": [
+        {
+          "id": "capexBurden",
+          "name": "资本开支/经营现金流",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "V1",
+      "dimension": "价值",
+      "name": "PE TTM",
+      "formula": "亏损时不适用；当前价格与TTM盈利，保留币种和股本口径。",
+      "fields": [
+        {
+          "id": "pe",
+          "name": "PE TTM",
+          "unit": "倍"
+        }
+      ]
+    },
+    {
+      "id": "V2",
+      "dimension": "价值",
+      "name": "PB",
+      "formula": "结合ROE观察；净资产非正时不作便宜程度排序。",
+      "fields": [
+        {
+          "id": "pb",
+          "name": "PB",
+          "unit": "倍"
+        }
+      ]
+    },
+    {
+      "id": "V3",
+      "dimension": "价值",
+      "name": "自由现金流收益率",
+      "formula": "非金融企业TTM(经营现金流−现金资本开支)/总市值。",
+      "fields": [
+        {
+          "id": "fcfYield",
+          "name": "自由现金流收益率",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "V4",
+      "dimension": "价值",
+      "name": "现金股息率",
+      "formula": "过去12个月现金股息/当前价格；标注特别股息。",
+      "fields": [
+        {
+          "id": "divYield",
+          "name": "现金股息率",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "V5",
+      "dimension": "价值",
+      "name": "主要估值历史分位",
+      "formula": "过去5年，按行业固定适用指标，须披露历史长度和估值锚。",
+      "fields": [
+        {
+          "id": "valuationRank",
+          "name": "估值历史分位",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "M1",
+      "dimension": "动量",
+      "name": "多周期收益",
+      "formula": "1/3/6/12个月收益，默认总收益；实际口径必须在来源中标注。",
+      "fields": [
+        {
+          "id": "ret1",
+          "name": "1个月收益",
+          "unit": "%"
+        },
+        {
+          "id": "ret3",
+          "name": "3个月收益",
+          "unit": "%"
+        },
+        {
+          "id": "ret6",
+          "name": "6个月收益",
+          "unit": "%"
+        },
+        {
+          "id": "ret12",
+          "name": "12个月收益",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "M2",
+      "dimension": "动量",
+      "name": "相对基准收益",
+      "formula": "同区间标的总收益减基准总收益，基准及币种保持一致。",
+      "fields": [
+        {
+          "id": "excess3",
+          "name": "3个月超额收益",
+          "unit": "pp"
+        }
+      ]
+    },
+    {
+      "id": "M3",
+      "dimension": "动量",
+      "name": "中期动量",
+      "formula": "12—1个月收益，排除最近1个月。",
+      "fields": [
+        {
+          "id": "mom12_1",
+          "name": "12—1动量",
+          "unit": "%"
+        }
+      ]
+    },
+    {
+      "id": "M4",
+      "dimension": "动量",
+      "name": "风险调整动量",
+      "formula": "126日收益/同窗口日收益年化波动率，仅作描述性排序。",
+      "fields": [
+        {
+          "id": "riskMomentum",
+          "name": "风险调整动量",
+          "unit": "倍"
+        }
+      ]
+    },
+    {
+      "id": "M5",
+      "dimension": "动量",
+      "name": "强弱排名变化",
+      "formula": "固定样本内3个月收益百分位，较20交易日前的变化，正值表示上升。",
+      "fields": [
+        {
+          "id": "rankChange",
+          "name": "排名百分位变化",
+          "unit": "pp"
+        }
+      ]
+    }
+  ],
+  "macroModules": [
+    {
+      "id": "CN",
+      "title": "中国消费复苏",
+      "question": "收入与信用改善，能否穿过价格竞争转成真实消费和企业现金？",
+      "path": "收入与就业 → 消费意愿与住房 → 商品及服务消费 → 利润与回款",
+      "metrics": [
+        "cn_income",
+        "cn_unemployment",
+        "cn_consumption",
+        "cn_spending_income",
+        "cn_retail",
+        "cn_service",
+        "cn_corecpi",
+        "cn_houseprice",
+        "cn_house_credit",
+        "cn_shortcredit"
+      ],
+      "chains": [
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "US",
+      "title": "美国通胀与增长代价",
+      "question": "核心通胀持续回落时，就业、需求与信用质量能否保持韧性？",
+      "path": "商品、住房与工资 → 核心通胀 → 利率与融资 → 真实支出与信用损失",
+      "metrics": [
+        "us_inflation",
+        "us_corepceyoy",
+        "us_corecpi",
+        "us_shelter",
+        "us_eci",
+        "us_expectation",
+        "us_unemployment",
+        "us_claims",
+        "us_pce",
+        "us_real_income",
+        "us_delinquency"
+      ],
+      "chains": [
+        "D",
+        "E"
+      ]
+    }
+  ],
+  "backgrounds": [
+    {
+      "id": "UST10",
+      "name": "美国10年期国债收益率",
+      "market": "US",
+      "unit": "%"
+    },
+    {
+      "id": "CGB10",
+      "name": "中国10年期国债收益率",
+      "market": "CN",
+      "unit": "%"
+    },
+    {
+      "id": "USDCNH",
+      "name": "美元兑离岸人民币",
+      "market": "CN",
+      "unit": "汇率"
+    },
+    {
+      "id": "VIX",
+      "name": "VIX波动率指数",
+      "market": "US",
+      "unit": "点"
+    },
+    {
+      "id": "BRENT",
+      "name": "布伦特原油",
+      "market": "GLOBAL",
+      "unit": "USD/桶"
+    },
+    {
+      "id": "COPPER",
+      "name": "铜价",
+      "market": "GLOBAL",
+      "unit": "USD/吨"
+    },
+    {
+      "id": "GOLD",
+      "name": "黄金",
+      "market": "GLOBAL",
+      "unit": "USD/盎司"
+    },
+    {
+      "id": "USDJPY",
+      "name": "美元兑日元",
+      "market": "JP",
+      "unit": "汇率"
+    },
+    {
+      "id": "JGB10",
+      "name": "日本10年期国债收益率",
+      "market": "JP",
+      "unit": "%"
+    }
+  ],
+  "narratives": [
+    {
+      "id": "N0",
+      "name": "中美信用周期与分配",
+      "type": "长期专题",
+      "hypothesis": "2027—2028年信用与支出的变化，能否从少数主体扩散到典型企业和居民？",
+      "support": "融资需求、实际支出和现金回收形成连续改善；非头部同步受益。",
+      "counter": "融资增长主要滚动偿债，投资和利润集中，尾部偿付压力持续上升。",
+      "next": "部门融资、贷款供需调查及季度财报交叉确认。",
+      "chains": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "assets": [
+        "601668.SH",
+        "MSFT",
+        "JPM",
+        "600036.SH"
+      ],
+      "metrics": [
+        "cn_credit",
+        "us_standards",
+        "us_demand",
+        "cn_breadth",
+        "us_breadth"
+      ]
+    },
+    {
+      "id": "N1",
+      "name": "AI投入与半导体回报",
+      "type": "产业主线",
+      "hypothesis": "算力投资能否带来终端收入与现金回报，并扩散到供应链？",
+      "support": "客户变现、供应商回款和非头部盈利同步改善。",
+      "counter": "资本承诺、折旧与库存快于终端需求，客户占款上升。",
+      "next": "核心客户财报、资本开支指引与供应商库存回款。",
+      "chains": [
+        "D"
+      ],
+      "assets": [
+        "SOX",
+        "MSFT",
+        "AMZN",
+        "GOOGL",
+        "NVDA",
+        "AVGO",
+        "TSM",
+        "601138.SH",
+        "300308.SZ"
+      ],
+      "metrics": [
+        "us_capex",
+        "us_orders",
+        "us_top"
+      ]
+    },
+    {
+      "id": "N2",
+      "name": "电力与基础设施兑现",
+      "type": "产业主线",
+      "hypothesis": "新增投入能否形成可执行订单、交付以及经营现金回收？",
+      "support": "订单转收入，利用率与现金改善，利润率保持。",
+      "counter": "订单延期、应收增加、扩产后利润率回落。",
+      "next": "项目实施、设备交付、回款及在建工程披露。",
+      "chains": [
+        "A",
+        "D"
+      ],
+      "assets": [
+        "600406.SH",
+        "600900.SH",
+        "ETN"
+      ],
+      "metrics": [
+        "cn_fiscal",
+        "cn_orders",
+        "cn_receivable"
+      ]
+    },
+    {
+      "id": "N3",
+      "name": "中国消费与盈利复苏",
+      "type": "宏观—经营",
+      "hypothesis": "收入就业改善能否带动广泛消费，而非依赖补贴和折扣？",
+      "support": "商品、服务与实际收入改善，渠道库存和公司回款同步确认。",
+      "counter": "交易量增长但利润率下降，改善只集中在少数品类。",
+      "next": "月度消费与就业、季度收入支出、公司分部经营。",
+      "chains": [
+        "B",
+        "C"
+      ],
+      "assets": [
+        "600519.SH",
+        "000333.SZ",
+        "600887.SH",
+        "03690.HK",
+        "09988.HK",
+        "01810.HK"
+      ],
+      "metrics": [
+        "cn_income",
+        "cn_retail",
+        "cn_service",
+        "cn_consumption"
+      ]
+    },
+    {
+      "id": "N4",
+      "name": "股东回报的经营支撑",
+      "type": "价值与回报",
+      "hypothesis": "分红与回购能否在保障必要投入后，由持续经营能力支持？",
+      "support": "现金或可分配利润覆盖回报，杠杆与资本缓冲稳定。",
+      "counter": "依靠新增负债、资产出售或减少必要投入维持派息。",
+      "next": "分红回购公告、现金流、债务与资本充足披露。",
+      "chains": [],
+      "assets": [
+        "000922",
+        "600900.SH",
+        "00941.HK",
+        "00883.HK",
+        "01088.HK",
+        "600036.SH",
+        "JPM"
+      ],
+      "metrics": [
+        "cn_coverage",
+        "us_coverage"
+      ]
+    },
+    {
+      "id": "N5",
+      "name": "资源周期与现金分配",
+      "type": "产业主线",
+      "hypothesis": "价格、产量和成本的组合能否形成现金回报，资本纪律是否延续？",
+      "support": "单位利润和现金流改善，扩产节制且股东回报有覆盖。",
+      "counter": "成本快于价格上涨，扩产吞噬现金，景气回落后分红承压。",
+      "next": "产品价格、产销量、单位成本与资本开支更新。",
+      "chains": [],
+      "assets": [
+        "601899.SH",
+        "00883.HK",
+        "01088.HK",
+        "XOM"
+      ],
+      "metrics": []
+    },
+    {
+      "id": "N6",
+      "name": "美国去通胀与资产定价",
+      "type": "宏观—定价",
+      "hypothesis": "通胀下行能否降低融资负担，同时保持实际需求和信用质量？",
+      "support": "核心通胀近期速度趋缓，就业消费稳定、信用损失未扩散。",
+      "counter": "通胀下降来自需求收缩，或住房工资压力导致反复。",
+      "next": "PCE/CPI、工资就业、消费与贷款调查。",
+      "chains": [
+        "E"
+      ],
+      "assets": [
+        "SPX",
+        "NDX",
+        "RUT",
+        "JPM",
+        "COST",
+        "HD"
+      ],
+      "metrics": [
+        "us_inflation",
+        "us_eci",
+        "us_pce",
+        "us_delinquency"
+      ]
+    }
+  ],
+  "proxies": [
+    {
+      "id": "IWF",
+      "name": "罗素1000成长ETF",
+      "market": "US"
+    },
+    {
+      "id": "IWD",
+      "name": "罗素1000价值ETF",
+      "market": "US"
+    },
+    {
+      "id": "XLY",
+      "name": "可选消费ETF",
+      "market": "US"
+    },
+    {
+      "id": "XLP",
+      "name": "必需消费ETF",
+      "market": "US"
+    }
+  ],
+  "stylePairs": [
+    [
+      "000852",
+      "000300"
+    ],
+    [
+      "399006",
+      "000300"
+    ],
+    [
+      "000922",
+      "000300"
+    ],
+    [
+      "HSTECH",
+      "HSI"
+    ],
+    [
+      "RUT",
+      "SPX"
+    ],
+    [
+      "SPXEW",
+      "SPX"
+    ],
+    [
+      "IWF",
+      "IWD"
+    ],
+    [
+      "XLY",
+      "XLP"
+    ],
+    [
+      "SOX",
+      "NDX"
+    ],
+    [
+      "N225",
+      "TOPIX"
+    ]
+  ]
+}

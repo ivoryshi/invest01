@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+var/*
+!var/.gitkeep
+var/factors/frozen-snapshots/
+var/factors/legacy-archives/
+var/factors/*.sqlite*
+var/factors/*.lock
+coverage/

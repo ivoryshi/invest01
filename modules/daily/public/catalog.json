@@ -1,0 +1,842 @@
+{
+  "schemaVersion": 1,
+  "indexedAt": "2026-09-16T04:40:24.024699+00:00",
+  "reports": [
+    {
+      "archiveKey": "77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e",
+      "sha256": "77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e",
+      "mode": "AM",
+      "date": "2026-09-16",
+      "title": "宽基与半导体分化，政策窗口仍待核验",
+      "summary": "本期按午间实际取证补发：美股9月15日宽基收跌而半导体ETF相对偏强，能源ETF上涨；亚洲数据时点不齐。仅覆盖实际取得的行情与官方日历，不能视为完整早间新闻扫描或07:45历史回放。",
+      "edition": "早报补刊·午间采集（非07:45快照）",
+      "cutoffAt": "2026-09-16T04:39:47.283456Z",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "late_supplement",
+      "htmlUrl": "./reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.html",
+      "jsonUrl": "./reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.json",
+      "missing": [
+        "未取得07:45完整历史可得证据；本期是午间补刊",
+        "完整新闻/公告扫描、最新中国消费及美国通胀发布未覆盖",
+        "日本指数、外汇、加密资产、信用利差未获取",
+        "亚洲时段与数据延迟未独立核实，不作同步当前行情比较",
+        "部分ETF前收盘与上期快照存在口径差异，原因未核验",
+        "9月15日晚报缺报；已提交State与Ledger不可得"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "title": "美股宽基收跌，半导体ETF相对偏强",
+          "fact": "本次供应商9月15日常规交易时段快照：SPY -0.46%、QQQ -0.65%、IWM -0.70%、SOXX +0.36%，均按本响应last_done/prev_close计算。",
+          "signal": "宽基与半导体ETF方向分化；SOXX是ETF代理，不是费城半导体指数点位。",
+          "inference": "只确认这组价格表现，未核验成分贡献、公司公告或行业盈利变化。",
+          "decision": "补充成分与成交宽度后再判断是否为行业扩散；本期不提交叙事状态。",
+          "invalidation": "若价格相对强弱不持续或公司证据不支持，不能外推中期产业结论。",
+          "sources": [
+            "S1"
+          ],
+          "asset": "跨资产观察",
+          "verification": "VERIFIED",
+          "importance": 3
+        },
+        {
+          "id": "DO-02",
+          "title": "能源ETF上涨，通胀叙事仍需实际数据验证",
+          "fact": "同一供应商常规时段数据：USO +3.32%、GLD +0.33%、TLT -0.27%。",
+          "signal": "能源代理上涨与长债ETF下跌同时出现。",
+          "inference": "ETF表现不能直接等同原油现货、国债收益率或通胀预期，也不能据此断言通胀下行结束。",
+          "decision": "继续观察核心通胀、信用利差与融资需求；当前缺少最新宏观发布和产业成本证据。",
+          "invalidation": "若后续价格回落或核心通胀证据相反，保留分歧，不倒填因果。",
+          "sources": [
+            "S1"
+          ],
+          "asset": "跨资产观察",
+          "verification": "VERIFIED",
+          "importance": 3
+        },
+        {
+          "id": "DO-03",
+          "title": "亚洲快照为午间数据，不能回填早盘判断",
+          "fact": "沪深300返回4479.55，时间2026-09-16 03:33:31 UTC；恒生指数24697.350，时间04:37:14 UTC。两条时间不一致，沪深300距本次采集超过一小时。",
+          "signal": "保留来源字段，但不作为同步当前行情比较；午间市场状态与供应商延迟未独立核验。",
+          "inference": "本期无法由指数快照确认消费复苏、风格扩散或当日市场宽度。",
+          "decision": "等待同窗口有效数据和消费行业/公司证据，缺失不填零。",
+          "invalidation": "若无法确认快照交易时段和新鲜度，排除其当前价格阈值判断。",
+          "sources": [
+            "S1"
+          ],
+          "asset": "跨资产观察",
+          "verification": "VERIFIED",
+          "importance": 3
+        },
+        {
+          "id": "DO-04",
+          "title": "FOMC仍是待观察事件",
+          "fact": "本次读取的美联储官方会议日历列示2026年9月15—16日会议，星号表示关联经济预测摘要；页面未列本次声明链接。",
+          "signal": "会议结果和预测材料待正式披露，本期不填入未核实决议或市场概率。",
+          "inference": "日历只证明计划安排，不证明政策方向。",
+          "decision": "Today Risk Map：后续核对官方声明与预测，再观察利率、风险资产和信用反馈；市场共识预期本期不可得。",
+          "invalidation": "若日历更新或正式材料与预期不同，记录变化并保持事前和事后判断分离。",
+          "sources": [
+            "S2"
+          ],
+          "asset": "跨资产观察",
+          "verification": "VERIFIED",
+          "importance": 3
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "Longbridge本次实际行情响应；原始证据内嵌",
+          "url": null,
+          "tier": "S1",
+          "retrieved_at": "2026-09-16T04:39:47.283456Z",
+          "snapshot_hash": "83b28773eae60994d984826fed745a9ddd85caebb48738b6df071714577e8885"
+        },
+        {
+          "id": "S2",
+          "title": "美联储FOMC官方会议日历",
+          "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+          "tier": "S0",
+          "retrieved_at": "2026-09-16T04:39:47.283456Z",
+          "snapshot_hash": "bef5c8a74d89609dc0d0a4917fc7aaa47177b6c06a3050e65e13c01143aeac66"
+        }
+      ]
+    },
+    {
+      "archiveKey": "2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf",
+      "sha256": "2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf",
+      "mode": "AM",
+      "date": "2026-09-15",
+      "title": "半导体收盘仍弱，亚洲早盘与政策窗口待观察",
+      "summary": "隔夜美股收盘补齐昨晚未结束的价格窗口：半导体ETF相对偏弱，原油ETF收涨、黄金ETF收跌。港股今早已有成交，A股接口仍需更新；本期明确区分收盘、盘中及不可用快照。",
+      "edition": "早报补刊·美股收盘与亚洲早盘",
+      "cutoffAt": "2026-09-15T01:37:37Z",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "late_supplement",
+      "htmlUrl": "./reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.html",
+      "jsonUrl": "./reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.json",
+      "missing": [
+        "未重建07:45完整证据，按实际采集时间补刊",
+        "A股接口尚无有效今日成交",
+        "最新中国消费发布未核实，排除检索中的往年数据",
+        "完整新闻扫描、公司经营归因",
+        "日本指数、FX、Crypto及信用利差",
+        "已提交State与完整Ledger"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "title": "半导体弱势延续至美股收盘",
+          "sources": [
+            "S1"
+          ],
+          "fact": "9月14日20:00 UTC常规收盘：SPY -0.45%，QQQ -0.80%，IWM -0.34%，SOXX -5.63%，均相对前收盘。",
+          "signal": "昨晚待收盘复核的半导体相对弱势，在这次收盘快照中仍存在。",
+          "inference": "收盘确认的是价格表现，不是产业资本开支恶化，也不是已登记策略的成功验证。",
+          "decision": "补充公司公告、成分贡献和市场宽度，区分集中冲击与行业扩散。",
+          "invalidation": "若后续相对表现反转或公司经营证据不支持，不能延伸为中期基本面结论。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-02",
+          "title": "原油ETF收涨，黄金ETF收跌",
+          "sources": [
+            "S1"
+          ],
+          "fact": "同日常规收盘：USO 1.14%，GLD -1.49%，TLT 0.07%。",
+          "signal": "油价代理与黄金代理方向不同，长债ETF变动较小。",
+          "inference": "ETF不是现货或收益率；仅凭这组价格不能确定通胀、美元或避险的因果解释。",
+          "decision": "继续核对实际利率、信用利差、原油合约和供应信息，再连接中美信用周期观察。",
+          "invalidation": "若跨资产与政策证据冲突，保持因果解释未决。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-03",
+          "title": "港股早盘回落，A股接口数据仍待更新",
+          "sources": [
+            "S1"
+          ],
+          "fact": "9月15日01:36:25 UTC恒生指数24822.660，较前收盘-0.38%。沪深300接口返回4480.08，但开高低为0、成交量0，时间戳停在01:15 UTC。",
+          "signal": "港股为今日盘中值；A股本期快照不可用来计算当日涨跌。",
+          "inference": "两地数据新鲜度不一致，暂不做今天跨市场相对强弱比较。",
+          "decision": "待有效A股成交更新后，再检查消费、成长和红利行业；消费复苏仍需销量、订单及现金流证据。",
+          "invalidation": "补齐有效同窗口数据前，不以旧值判横盘或市场韧性。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-04",
+          "title": "FOMC会议进入日历窗口",
+          "sources": [
+            "S2"
+          ],
+          "fact": "美联储官方9月日历列示9月15—16日召开两日会议；本期没有已公布的本次政策结果。",
+          "signal": "会议窗口临近，结果及后续解释仍待观察。",
+          "inference": "日历不代表加息或降息预测；本期没有核实市场概率。",
+          "decision": "政策公布后再核对文本、预测、利率及风险资产反应；保持不同期限判断分离。",
+          "invalidation": "若政策和价格反馈不同于研究预期，记录反证，不倒填事前判断。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "Longbridge本次实际行情响应（原始快照内嵌）",
+          "url": null,
+          "tier": "S1",
+          "retrieved_at": "2026-09-15T01:37:37Z"
+        },
+        {
+          "id": "S2",
+          "title": "美联储2026年9月官方日历",
+          "url": "https://www.federalreserve.gov/newsevents/2026-september.htm",
+          "tier": "S0",
+          "retrieved_at": "2026-09-15T01:37:37Z"
+        }
+      ]
+    },
+    {
+      "archiveKey": "256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4",
+      "sha256": "256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4",
+      "mode": "PM",
+      "date": "2026-09-14",
+      "title": "半导体盘中承压，中港收市分化，政策窗口待验证",
+      "summary": "本期更新早间观察：半导体ETF在美国常规盘中继续偏弱，A股与港股宽基收市方向分化；原油ETF上涨与黄金ETF下跌并存。美国尚未收盘，相关研究判断保持未决。",
+      "edition": "晚报补刊·美股盘中版",
+      "cutoffAt": "2026-09-14T15:24:06Z",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "late_supplement",
+      "htmlUrl": "./reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.html",
+      "jsonUrl": "./reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.json",
+      "missing": [
+        "22:45历史窗口未完整留存，按实际采集时点补刊",
+        "完整新闻扫描和价格变化归因",
+        "日本指数、外汇与加密资产报价",
+        "行业/公司经营分项、信用利差",
+        "已提交State与完整到期Ledger"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "title": "半导体常规盘仍弱，早间观察尚未完成收盘验证",
+          "sources": [
+            "S1"
+          ],
+          "fact": "截至约15:10 UTC美股常规盘快照，SPY -0.68%，QQQ -1.14%，IWM -0.49%，SOXX -5.76%，均相对前次常规收盘。",
+          "signal": "本次常规盘中半导体ETF跌幅较大。",
+          "inference": "早报提出开市后复核相对弱势，本次价格方向延续；美国尚未收盘，不能记为最终验证或基本面结论。",
+          "decision": "收盘后继续比较SOXX、QQQ与SPY的相对表现，再核对成交、公司公告和市场宽度。",
+          "invalidation": "常规收盘前若相对表现显著反转，应修正延续判断；没有经营证据不能归因于资本开支下滑。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-02",
+          "title": "A股与港股收市方向分化",
+          "sources": [
+            "S1"
+          ],
+          "fact": "沪深300收4480.08，较前收盘-0.67%；恒生指数收24917.600，较前收盘0.45%。快照分别为07:00及08:08:28 UTC。",
+          "signal": "A股宽基下跌、港股宽基上涨；早报盘前数据缺口已有当日结果补充。",
+          "inference": "跨市场分化不直接等于中国消费或信用周期发生反转。",
+          "decision": "后续拆分消费、科技、红利及行业贡献，联读销量、订单、库存和回款；本期缺行业分项。",
+          "invalidation": "若行业贡献与宽基方向不同，不能将宽基变动套用到消费复苏命题。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-03",
+          "title": "跨资产：原油ETF上涨，黄金ETF下跌",
+          "sources": [
+            "S1"
+          ],
+          "fact": "同批美国盘中快照：USO 1.79%，GLD -1.54%，TLT 0.05%，均为ETF价格相对前收盘变化。",
+          "signal": "原油与黄金ETF方向不同，长债ETF变化较小。",
+          "inference": "早报观察到原油ETF走高，本次方向仍在；无法单凭价格确认通胀、避险或融资条件的共同原因。",
+          "decision": "补充美元、实际利率、信用利差及原油合约信息后再评估中美信用周期传导。",
+          "invalidation": "若其他资产与宏观证据不支持，保留单资产价格事实，撤回共同因果解释。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        },
+        {
+          "id": "DO-04",
+          "title": "政策会议窗口仍在前方",
+          "sources": [
+            "S2",
+            "S3"
+          ],
+          "fact": "本次核对官方日历：FOMC会议9月15—16日，日本央行会议9月17—18日；截至本刊两项政策结果尚未发生。",
+          "signal": "会议结果仍是后续信息更新窗口。",
+          "inference": "日历不是政策预测，本期不填市场加息概率或预设结果。",
+          "decision": "会后分别观察政策文本、利率和汇率反馈；日本指数、FX与Crypto仍需补充。",
+          "invalidation": "若政策与市场反应不同于研究假设，应保留反证，不倒填事前预判。",
+          "asset": "跨市场",
+          "verification": "VERIFIED"
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "Longbridge本次真实行情响应（内嵌JSON）",
+          "url": null,
+          "tier": "S1",
+          "retrieved_at": "2026-09-14T15:24:06Z"
+        },
+        {
+          "id": "S2",
+          "title": "美联储2026年9月官方日历",
+          "url": "https://www.federalreserve.gov/newsevents/2026-september.htm",
+          "tier": "S0",
+          "retrieved_at": "2026-09-14T15:24:06Z"
+        },
+        {
+          "id": "S3",
+          "title": "日本央行会议日历",
+          "url": "https://www.boj.or.jp/en/mopo/mpmsche_minu/",
+          "tier": "S0",
+          "retrieved_at": "2026-09-14T15:24:06Z"
+        }
+      ]
+    },
+    {
+      "archiveKey": "af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5",
+      "sha256": "af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5",
+      "mode": "AM",
+      "date": "2026-09-14",
+      "title": "半导体夜盘转弱、原油ETF走高，进入央行会议周",
+      "summary": "早报补刊：以实际采集的美股夜盘变化为起点，重点复核半导体相对强弱、原油与利率传导。A股港股尚无本期有效常规交易价格，保持盘前缺口。本周等待美联储与日本央行政策结果。",
+      "edition": "早报补刊·实际采集时点版",
+      "cutoffAt": "2026-09-14T01:11:49.260336+00:00",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "late_supplement",
+      "htmlUrl": "./reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.html",
+      "jsonUrl": "./reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.json",
+      "missing": [
+        "早间07:45快照不可重建，本期使用实际采集时间",
+        "完整新闻扫描及价格变化归因",
+        "日本、外汇与加密资产行情",
+        "公司经营数据与信用利差",
+        "生产历史State/Ledger"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "title": "美股夜盘：半导体回撤幅度较大",
+          "asset": "跨市场",
+          "sources": [
+            "S1"
+          ],
+          "verification": "VERIFIED",
+          "fact": "9月14日01:09 UTC附近的供应商夜盘快照，相对9月11日常规收盘：SPY -0.46%，QQQ -1.19%，SOXX -2.70%，IWM -0.15%。各对象时间不完全相同。",
+          "signal": "本次夜盘半导体ETF跌幅大于大盘及小盘ETF。",
+          "inference": "与昨天记录的周五收盘强势相比，价格方向发生变化；夜盘流动性不同，不代表今晚收盘或基本面变化。",
+          "decision": "在美国常规开市后复核相对强弱、量能及市场宽度；继续观察半导体资本开支与订单，不能从夜盘推断产业趋势。",
+          "invalidation": "若常规时段相对表现反转，夜盘弱势不得延伸为趋势判断。"
+        },
+        {
+          "id": "DO-02",
+          "title": "油价代理走高，利率与通胀解释仍需证据",
+          "asset": "跨市场",
+          "sources": [
+            "S1"
+          ],
+          "verification": "VERIFIED",
+          "fact": "同批夜盘快照：USO +2.48%，GLD -0.28%，TLT +0.01%；均为ETF价格对最近常规收盘的变化。",
+          "signal": "原油ETF上涨与权益ETF下跌同时出现。",
+          "inference": "这只是价格共现，尚不能确认新闻原因或通胀再加速；USO不是原油现货，TLT不是国债收益率。",
+          "decision": "核验原油供应新闻、现货/期货合约与美国实际利率，再评估对通胀、消费成本和信用融资的影响。",
+          "invalidation": "若供应信息或常规时段行情不支持，该宏观解释保持未决。"
+        },
+        {
+          "id": "DO-03",
+          "title": "中国市场盘前：旧收盘不能当今日零涨跌",
+          "asset": "跨市场",
+          "sources": [
+            "S1"
+          ],
+          "verification": "VERIFIED",
+          "fact": "沪深300返回4510.16、恒生指数返回24805.63；本次快照开盘/最高/最低均为0，尚未取得今日常规交易价格。",
+          "signal": "本期没有可用的A股和港股今日常规涨跌。",
+          "inference": "供应商时间刷新不等于产生新成交，不能把前值相等解读成今日横盘。",
+          "decision": "开盘后取得有效成交，再观察消费、红利、成长与市场宽度；消费复苏继续由收入、销量、库存和现金流共同验证。",
+          "invalidation": "若后续取得有效成交，替换盘前缺口，保留本期快照不改历史。"
+        },
+        {
+          "id": "DO-04",
+          "title": "本周政策日历：等待结果，不预设方向",
+          "asset": "跨市场",
+          "sources": [
+            "S2",
+            "S3"
+          ],
+          "verification": "VERIFIED",
+          "fact": "官方日历列示美联储FOMC会议为9月15—16日，日本央行会议为9月17—18日；截至本期尚未发生。",
+          "signal": "本周美国、日本货币政策信息将更新。",
+          "inference": "政策对融资成本、美元和日元的影响取决于结果与此前定价的差异；本期未核验市场概率。",
+          "decision": "会后连接利率与信用利差、TOPIX/日经225及银行/出口企业观察；保留中美2027—2028信用周期命题待验证。",
+          "invalidation": "若实际政策和市场反馈不支持初步解释，应登记反证而非补写预判。"
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "Longbridge实际行情响应，原始快照附于JSON",
+          "url": null,
+          "tier": "S1",
+          "retrieved_at": "2026-09-14T01:11:49.260336+00:00"
+        },
+        {
+          "id": "S2",
+          "title": "美联储会议日历",
+          "url": "https://www.federalreserve.gov/monetarypolicy.htm",
+          "tier": "S0",
+          "retrieved_at": "2026-09-14T01:11:49.260336+00:00"
+        },
+        {
+          "id": "S3",
+          "title": "日本银行会议日历",
+          "url": "https://www.boj.or.jp/en/mopo/mpmsche_minu/",
+          "tier": "S0",
+          "retrieved_at": "2026-09-14T01:11:49.260336+00:00"
+        }
+      ]
+    },
+    {
+      "archiveKey": "2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee",
+      "sha256": "2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee",
+      "mode": "PM",
+      "date": "2026-09-13",
+      "title": "通胀分化、产业利润传导与下周央行窗口",
+      "summary": "本期将观察重点放在三处：美国核心通胀同比放缓能否延续；中国上游涨价能否转化为下游需求与现金流；半导体价格强势能否得到经营数据支持。最近交易日美股ETF反弹、A股港股宽基回落，均不足以单独确认信用周期拐点。下周等待美联储及日本央行会议。",
+      "edition": "周末日报·手动补刊（20时段，非23点定时晚报）",
+      "cutoffAt": "2026-09-13T12:12:41.178555+00:00",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "manual_weekend",
+      "htmlUrl": "./reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.html",
+      "jsonUrl": "./reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.json",
+      "missing": [
+        "生产级历史State/Ledger",
+        "日本指数报价（请求未返回）",
+        "FX及Crypto快照",
+        "国债收益率及信用利差",
+        "公司最新财务与订单数据",
+        "完整全球新闻扫描"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "title": "美国通胀：核心同比放缓，环比与能源仍有压力",
+          "asset": "美国宏观 / 利率",
+          "sources": [
+            "S1"
+          ],
+          "fact": "8月核心CPI环比上涨0.3%，7月为0.2%；核心同比上涨2.4%。整体CPI同比上涨3.4%，汽油环比上涨3.9%。",
+          "signal": "核心同比与环比方向不同，能源价格对整体通胀仍构成压力。",
+          "inference": "单月核心同比放缓不足以确认通胀持续下行；还需分辨基数、住房和能源传导。",
+          "decision": "跟踪核心PCE、住房租金和工资，并检查零售与运输企业成本及毛利率；不由单月CPI推断政策方向。",
+          "invalidation": "若后续核心环比持续加速，削弱通胀下行假设；若能源回落且服务价格同步放缓，证据才更完整。",
+          "verification": "VERIFIED",
+          "stars": 4,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-02",
+          "title": "中国消费：价格回升与需求复苏仍需分开验证",
+          "asset": "中国消费 / 下游",
+          "sources": [
+            "S2"
+          ],
+          "fact": "8月CPI同比上涨0.8%、环比上涨0.4%；服务价格同比上涨0.8%、环比上涨0.1%；食品同比下降1.4%。",
+          "signal": "商品与服务价格表现有差异，价格指数本身不提供销量和消费意愿证据。",
+          "inference": "消费复苏需由实际收入、销量和企业现金回款共同确认。",
+          "decision": "观察伊利、安井食品、美团等公司的销量/订单、单价、促销、应收和经营现金流；本期未取得新公司披露，不认定其业绩改善。",
+          "invalidation": "价格回升但销量走弱、库存或应收增加，将削弱需求驱动的复苏判断。",
+          "verification": "VERIFIED",
+          "stars": 4,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-03",
+          "title": "中国上中下游：购进价格涨幅高于出厂价格",
+          "asset": "中国信用 / 产业利润",
+          "sources": [
+            "S3"
+          ],
+          "fact": "8月PPI同比上涨3.8%，购进价格上涨5.8%；采掘、原材料、加工分别上涨17.8%、6.7%、3.1%，生活资料下降0.5%。",
+          "signal": "价格上涨在产业链中的分布不均，购销价格涨幅差为2.0个百分点。",
+          "inference": "该差值仅为不同篮子的宏观比较，不能直接等同公司毛利率下降；定价权与库存周期决定利润归属。",
+          "decision": "上游观察资源企业价格与现金流，中游观察设备/制造企业订单、成本和应收，下游观察消费企业销量与费用率；叠加贷款需求、融资成本及偿债指标检验2027—2028信用传导。",
+          "invalidation": "若下游订单、利润和现金流广泛改善，需修正收益仅集中于上游的假设。",
+          "verification": "VERIFIED",
+          "stars": 4,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-04",
+          "title": "美股反弹：半导体ETF领先，小盘ETF较弱",
+          "asset": "美股 / 风格 / 半导体",
+          "sources": [
+            "S6"
+          ],
+          "fact": "9月11日常规时段收盘相对前收盘：SPY +0.85%，QQQ +0.87%，IWM +0.41%，SOXX +1.86%。",
+          "signal": "本次单日行情中，半导体ETF涨幅大于大盘和小盘ETF。",
+          "inference": "这是价格层的相对表现，尚不能确认AI资本开支周期增强或行情广泛扩散。",
+          "decision": "继续跟踪SOX指数本身、等权表现、市场宽度，以及英伟达/台积电/微软的订单、资本开支和现金回收；SOXX不冒充SOX指数。",
+          "invalidation": "若半导体后续相对走弱，或盈利修订与价格持续背离，单日领先不构成趋势确认。",
+          "verification": "VERIFIED",
+          "stars": 3,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-05",
+          "title": "跨资产：原油ETF下跌，黄金及长债ETF收涨",
+          "asset": "黄金 / 原油 / 利率",
+          "sources": [
+            "S6"
+          ],
+          "fact": "9月11日GLD +0.61%，TLT +0.11%，USO -2.20%，均按常规时段收盘对前收盘计算。",
+          "signal": "三类ETF的价格变化方向不同。",
+          "inference": "单日共振不足以确认避险或宽松交易；ETF价格不等于黄金现货、原油现货或国债收益率。",
+          "decision": "补充实际利率、美元、信用利差与原油期限结构后，再评价通胀及融资条件。",
+          "invalidation": "若利率、美元及信用利差不支持，不能把ETF涨跌归因于同一宏观因素。",
+          "verification": "VERIFIED",
+          "stars": 3,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-06",
+          "title": "A股与港股：最近收盘偏弱，消费主线尚无价格确认",
+          "asset": "A股 / 港股",
+          "sources": [
+            "S6"
+          ],
+          "fact": "9月11日沪深300收4510.16，较前收盘-0.84%；恒生指数收24805.63，较前收盘-0.60%。",
+          "signal": "两个宽基指数在最近交易日均下跌。",
+          "inference": "宽基表现不能代表消费行业，也不能据此否定消费复苏。",
+          "decision": "补充消费行业相对收益、上涨家数和龙头经营数据，再与收入就业及信用需求联读。",
+          "invalidation": "若消费行业与基本面持续相对改善，应与宽基短期弱势分开判断。",
+          "verification": "VERIFIED",
+          "stars": 3,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        },
+        {
+          "id": "DO-07",
+          "title": "下周日历：美联储与日本央行政策会议",
+          "asset": "美国 / 日本 / 汇率",
+          "sources": [
+            "S4",
+            "S5"
+          ],
+          "fact": "官方日历列示FOMC于9月15—16日召开，日本央行于9月17—18日召开货币政策会议；截至本报告均尚未发生。",
+          "signal": "下周利率、美元与日元相关资产面临政策信息更新窗口。",
+          "inference": "应按政策结果与此前市场定价的差异观察传导，不预填加息或降息概率。",
+          "decision": "日本参照继续使用TOPIX与日经225，补充日元、银行与出口企业表现；缺少本期日本报价，暂不排名。",
+          "invalidation": "若会后市场反馈与初步机制解释相反，保留反证并复核；本期不登记已验证的方向判断。",
+          "verification": "VERIFIED",
+          "stars": 4,
+          "horizon": "下周至未来两个季度",
+          "confidence": "事实已核验；机制推断待验证"
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "BLS：2026年8月CPI",
+          "url": "https://www.bls.gov/news.release/archives/cpi_09112026.htm",
+          "published": "2026-09-11",
+          "tier": "S0",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        },
+        {
+          "id": "S2",
+          "title": "国家统计局：2026年8月CPI",
+          "url": "https://www.stats.gov.cn/zwfwck/sjfb/202609/t20260909_1965263.html",
+          "published": "2026-09-09",
+          "tier": "S0",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        },
+        {
+          "id": "S3",
+          "title": "国家统计局：2026年8月PPI",
+          "url": "https://www.stats.gov.cn/sj/zxfbhjd/202609/t20260909_1965262.html",
+          "published": "2026-09-09",
+          "tier": "S0",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        },
+        {
+          "id": "S4",
+          "title": "美联储FOMC会议日历",
+          "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+          "published": null,
+          "tier": "S0",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        },
+        {
+          "id": "S5",
+          "title": "日本银行货币政策会议日历",
+          "url": "https://www.boj.or.jp/en/mopo/mpmsche_minu/",
+          "published": null,
+          "tier": "S0",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        },
+        {
+          "id": "S6",
+          "title": "Longbridge行情快照（原始响应内嵌于JSON）",
+          "url": null,
+          "published": "2026-09-11",
+          "tier": "S1",
+          "retrieved_at": "2026-09-13T12:12:41.178555+00:00",
+          "first_available_at": "2026-09-13T12:12:41.178555+00:00",
+          "usage_rights": "链接及最小事实摘要；不复制来源全文"
+        }
+      ]
+    },
+    {
+      "archiveKey": "5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b",
+      "sha256": "5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b",
+      "mode": "PM",
+      "date": "2026-09-11",
+      "title": "能源与利率约束仍在，等待今晚CPI验证",
+      "summary": "本期最重要的工作，是把已知的价格与政策变化、尚未发生的美国CPI，以及不能证实的市场归因清楚分开。",
+      "edition": "晚报提前版",
+      "cutoffAt": "2026-09-11T08:40:41Z",
+      "qualityStatus": "DEGRADED",
+      "publicationKind": "early",
+      "htmlUrl": "./reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.html",
+      "jsonUrl": "./reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.json",
+      "missing": [
+        "真实历史AM/State",
+        "CPI结果",
+        "当前完整Rates/FX/Crypto报价",
+        "已登记可执行状态阈值"
+      ],
+      "objects": [
+        {
+          "id": "DO-01",
+          "stars": 5,
+          "asset": "US · INFLATION / RATES",
+          "title": "PPI再度抬升，今晚CPI决定下一步如何解释",
+          "subtitle": "最重要的未完成验证",
+          "verification": "VERIFIED · S0",
+          "sources": [
+            "S1",
+            "S4"
+          ],
+          "freshness": "昨日发布 → 今晚待验证",
+          "fact": "美国8月最终需求PPI环比上涨0.4%、同比上涨5.4%；剔除食品、能源和贸易服务后环比上涨0.3%。8月CPI预定今晚20:30发布，当前未有本期结果。",
+          "signal": "生产端价格压力仍在。PPI与CPI统计对象不同，不能将前者直接当作后者的已知结果。",
+          "inference": "成本压力若进一步传到消费者端，会增加政策与估值的不确定性；若核心消费价格温和，市场也可能重新区分能源冲击与基础通胀。",
+          "decision": "把今晚观察重点放在核心分项、服务价格与利率反应的一致性；暂不将单一PPI数据转成明确加息结论。",
+          "invalidation": "若CPI结构未显示压力扩散，且随后收益率未继续上行，则需下调“广泛通胀再加速”的解释权重。",
+          "alternative": "能源和批发端利润率变化可能抬高PPI，却未同步转化为消费者需求过热。",
+          "horizon": "战术：今晚至下周政策会议",
+          "confidence": "机制判断：中等；今晚结果：待验证"
+        },
+        {
+          "id": "DO-02",
+          "stars": 5,
+          "asset": "EUROPE · POLICY",
+          "title": "欧洲央行选择加息，政策约束仍然存在",
+          "subtitle": "宣布日与生效日必须分开",
+          "verification": "VERIFIED · S0",
+          "sources": [
+            "S2"
+          ],
+          "freshness": "9月10日公布",
+          "fact": "欧洲央行宣布三项关键利率上调25个基点；存款便利利率将升至2.50%，9月16日起生效。",
+          "signal": "欧洲的能源通胀压力已对应到实际政策行动，而非只有媒体的加息讨论。",
+          "inference": "更高融资成本可能限制估值修复；但对银行、能源与高负债行业的影响并不相同，不能一概而论。",
+          "decision": "复核欧洲资产对利率和能源成本的敏感度；不把这次决定机械外推成欧元必涨或全球央行都会同步加息。",
+          "invalidation": "若之后通胀回落、政策指引转弱或融资条件未继续收紧，应重新评估这条传导。",
+          "alternative": "市场可能已提前定价部分加息，宣布后的资产变化未必与政策方向同幅。",
+          "horizon": "周期：未来1–6个月",
+          "confidence": "政策事实：高；资产传导：中等"
+        },
+        {
+          "id": "DO-03",
+          "stars": 4,
+          "asset": "OIL · CROSS-ASSET",
+          "title": "油价冲击的关键，是持续时间而非单日涨跌",
+          "subtitle": "风险溢价与实际供应分开验证",
+          "verification": "MULTI_SOURCE_VERIFIED · S1×2",
+          "sources": [
+            "S7",
+            "S8"
+          ],
+          "freshness": "隔夜共同报道",
+          "fact": "Reuters与AP均报道9月10日原油价格升至每桶100美元以上，同时美股收低；两家报道都将中东供应通道扰动列为重要背景。",
+          "signal": "能源价格与风险资产同时受关注，成本端冲击需要持续跟踪。两家独立报道只支持共同覆盖的事实范围。",
+          "inference": "油价保持高位会通过企业成本、通胀预期与利率渠道影响资产；单日回落则可能只是风险溢价变化。",
+          "decision": "观察油价、真实运输恢复与通胀分项是否同向改善。仅凭价格回落，不宣布实体供应已经恢复。",
+          "invalidation": "后续可追溯的物流或产量证据显示供应持续恢复，且能源成本压力回落，才支持减弱这条风险叙事。",
+          "alternative": "库存、期货仓位及市场流动性也会影响油价，当前资料不能单独识别其贡献。",
+          "horizon": "战术与周期分别跟踪",
+          "confidence": "共同事实：中等；实体恢复：未核实"
+        },
+        {
+          "id": "DO-05",
+          "stars": 4,
+          "asset": "CHINA · PRICES",
+          "title": "CPI与PPI回升，仍需区分需求与成本",
+          "subtitle": "两日前发布的数据，作为当前背景",
+          "verification": "VERIFIED · S0",
+          "sources": [
+            "S3"
+          ],
+          "freshness": "背景更新：9月9日发布",
+          "fact": "国家统计局公布8月CPI同比上涨0.8%、核心CPI上涨1.0%，PPI同比上涨3.8%；CPI与PPI环比均上涨0.4%。",
+          "signal": "消费端与生产端价格均回升，但幅度不同，不足以直接证明所有行业的需求与利润同步改善。",
+          "inference": "如果主要由投入成本推动，企业利润能否受益取决于定价能力及成本传导；需和后续量、价、利润数据合看。",
+          "decision": "保留价格回升这一背景，等待需求与利润证据，不据此自动切换为全面复苏判断。",
+          "invalidation": "若后续需求、销量或利润并未跟上价格，需降低对广泛盈利修复的预期。",
+          "alternative": "季节性与国际商品价格变化均可影响读数，单月数据不能识别长期需求趋势。",
+          "horizon": "周期：未来1–3个月",
+          "confidence": "统计事实：高；需求解释：待验证"
+        },
+        {
+          "id": "DO-04",
+          "stars": 3,
+          "asset": "CHINA / HONG KONG · EQUITY",
+          "title": "沪深港报价走弱，结构性机会需要独立证据",
+          "subtitle": "收市价格与经济解释分别记录",
+          "verification": "VERIFIED · S1行情",
+          "sources": [
+            "S10"
+          ],
+          "freshness": "今日收市快照",
+          "fact": "本次行情快照显示上证、深证成指、创业板指与恒生指数均低于各自前收。四项具体数值、涨跌幅与时间见市场表。",
+          "signal": "整体价格表现偏弱，不能仅凭单一热门主题推断广泛风险偏好已经改善。",
+          "inference": "外部利率与能源风险可能形成估值压力，但本次资料不足以把今日下跌精确归因于某个因素。",
+          "decision": "继续将指数、行业与公司证据分层；缺少盈利或订单证据时，不从盘面强弱直接推出产业趋势。",
+          "invalidation": "若后续上涨广度、成交结构和盈利证据共同改善，应重新评估“广泛风险偏好仍弱”的观察。",
+          "alternative": "指数权重与局部资金流可以解释部分差异；本期未接入完整涨跌家数和行业归因数据。",
+          "horizon": "战术：今日收市至下一交易窗口",
+          "confidence": "价格事实：中等；归因：低"
+        },
+        {
+          "id": "DO-06",
+          "stars": 3,
+          "asset": "GOLD · DIVERSIFICATION",
+          "title": "黄金ETF的隔夜表现提醒：避险并非单一方向",
+          "subtitle": "使用ETF观测，不替代现货报价",
+          "verification": "VERIFIED · S1行情",
+          "sources": [
+            "S10"
+          ],
+          "freshness": "隔夜收市与今日盘前分栏",
+          "fact": "GLD在9月10日常规交易收于396.360美元，低于前收403.350美元；今日盘前快照为399.410美元。两者属于不同交易窗口。",
+          "signal": "隔夜黄金ETF并未与股票形成简单的反向表现；盘前回升也尚未经过完整常规交易窗口检验。",
+          "inference": "避险需求、实际利率和美元因素可能同时作用。本期没有完整现货、实际利率与汇率同步数据，不能判定主导因素。",
+          "decision": "以多因素框架复核黄金的分散作用，不把地缘风险上升自动等同黄金必涨，也不根据单日下跌否定长期逻辑。",
+          "invalidation": "补齐同时间窗口的现货、实际利率和美元数据后，若方向关系不支持当前解释，应调整机制权重。",
+          "alternative": "ETF交易时点、流动性及跟踪差异可能造成短期表现偏离；GLD价格不是金价。",
+          "horizon": "战术：今晚完整交易窗口",
+          "confidence": "ETF报价：中等；黄金机制：未决"
+        }
+      ],
+      "sources": [
+        {
+          "id": "S1",
+          "title": "美国BLS｜2026年8月PPI",
+          "tier": "S0",
+          "published": "2026-09-10 08:30 ET",
+          "url": "https://www.bls.gov/news.release/archives/ppi_09102026.htm",
+          "note": "正式发布；最终需求PPI及分项。环比经季调、同比未经季调。"
+        },
+        {
+          "id": "S2",
+          "title": "欧洲央行｜9月10日货币政策决定",
+          "tier": "S0",
+          "published": "2026-09-10；9月16日生效",
+          "url": "https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.mp260910~314e508016.en.html",
+          "note": "决议、利率生效日与经济预测；只采用官方已公布内容。"
+        },
+        {
+          "id": "S3",
+          "title": "国家统计局｜8月CPI与PPI解读",
+          "tier": "S0",
+          "published": "2026-09-09 09:30 北京时间",
+          "url": "https://www.stats.gov.cn/sj/sjjd/202609/t20260909_1965261.html",
+          "note": "两日前发布的背景资料，不标为今日新增。"
+        },
+        {
+          "id": "S4",
+          "title": "美国BLS｜CPI发布日历",
+          "tier": "S0",
+          "published": "本次核验：2026-09-11",
+          "url": "https://www.bls.gov/cpi/",
+          "note": "8月CPI预定9月11日08:30美东时间发布；本版截止时尚未到时。"
+        },
+        {
+          "id": "S5",
+          "title": "美联储｜FOMC会议日历",
+          "tier": "S0",
+          "published": "2026年官方日历",
+          "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+          "note": "9月15–16日会议，带经济预测；不据此预测政策方向。"
+        },
+        {
+          "id": "S6",
+          "title": "日本银行｜发布与会议日历",
+          "tier": "S0",
+          "published": "2026年9月日历",
+          "url": "https://www.boj.or.jp/en/about/calendar/index.htm",
+          "note": "9月17–18日政策会议，结果尚未公布。"
+        },
+        {
+          "id": "S7",
+          "title": "Reuters｜9月10日美股与油价报道",
+          "tier": "S1 · Reuters原始采编",
+          "published": "2026-09-10 美股收市报道",
+          "url": "https://za.investing.com/news/economy-news/wall-st-set-for-lower-open-after-hotterthanexpected-producer-inflation-data-4460347",
+          "note": "由Investing.com转载；转载页面不视为第二个独立来源。只取正文，不采用旁栏无明确时间的报价。"
+        },
+        {
+          "id": "S8",
+          "title": "AP｜9月10日美股收市综述",
+          "tier": "S1 · AP原始采编",
+          "published": "2026-09-10 20:19:35 UTC",
+          "url": "https://apnews.com/article/0c547c6cc3e374a2c04f78a90e35e113",
+          "note": "用于收市指数与10年期收益率报道快照；并非当前实时报价。"
+        },
+        {
+          "id": "S9",
+          "title": "AP｜9月11日亚洲盘报道",
+          "tier": "S1 · AP原始采编",
+          "published": "2026-09-11 04:59:37 UTC",
+          "url": "https://apnews.com/article/8c3272812f5e9b9238c6a3301921c17a",
+          "note": "日本与汇率为报道时盘中快照；不充作收盘。"
+        },
+        {
+          "id": "S10",
+          "title": "Longbridge｜本次行情与市场状态快照",
+          "tier": "S1 · 行情供应商",
+          "published": "拉取于2026-09-11约16:39 北京时间",
+          "url": null,
+          "note": "quote与market_status接口。正文保留每项行情时间戳，原始响应嵌入本文件附录，可下载证据JSON。ETF价格不等于现货或指数点位。"
+        }
+      ]
+    }
+  ]
+}

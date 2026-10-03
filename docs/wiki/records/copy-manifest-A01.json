@@ -1,0 +1,174 @@
+{
+  "batch": "A01-observatory-daily",
+  "copied_at": "2026-09-16",
+  "records": [
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/build.py",
+      "target": "modules/observatory/src/build.py",
+      "source_sha256": "d6f855b396fa52c393c657fc6dc6825a26b39af03f7f252227770d6190eab66d",
+      "adapted_sha256": "da2282d23d2ad7fa5651c7453a03c977b63c68222f28b07678b16a35723cd1d6",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/expand.py",
+      "target": "modules/observatory/src/expand.py",
+      "source_sha256": "3274a7dc996e147f2b9e0c9015a8c2eaca92c85645eed0a9cc5cb8fdda257c48",
+      "adapted_sha256": "3274a7dc996e147f2b9e0c9015a8c2eaca92c85645eed0a9cc5cb8fdda257c48",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/app.js",
+      "target": "modules/observatory/src/app.js",
+      "source_sha256": "8180e7ee4853bd5a8853703bb88518bcc6fbb46a2b75e8d4516eb6eff365a83a",
+      "adapted_sha256": "5fcc03d08a7a9fcac6cd87f84917122198a6c23006145dff1331957674f1e255",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/complete.js",
+      "target": "modules/observatory/src/complete.js",
+      "source_sha256": "a10bb98f16d2eb7427e2c918f278375f08213161aa1fa2ab1f45bfe85087b8cc",
+      "adapted_sha256": "35cca7eb3aae0be39231836714ff8bf522a6550b8ad267ba0e74d735a59853d1",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/daily.js",
+      "target": "modules/observatory/src/daily.js",
+      "source_sha256": "940df1073f44290983c1abea869a2a8528b49be78c7a56f48aa3a00a74a9350b",
+      "adapted_sha256": "87d3e9bd9451c74af7fb03e72e126422988468350fc051db121bbf7533070791",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/shell.html",
+      "target": "modules/observatory/src/shell.html",
+      "source_sha256": "1b7d2b6b613a3db1ab76b6e8c5ba1176ae6f8b57088f35e46946d97c807e5965",
+      "adapted_sha256": "029c0b7b00f82d017c644a20ffb8e49b2ce4b4452b40247aaa5b872f43e8efc4",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/dashboard/verify.cjs",
+      "target": "modules/observatory/src/verify.cjs",
+      "source_sha256": "5268da395eb30168aa8847a0f6c197adfbb7502bbb7dcacde1e9d6b1ecfa961c",
+      "adapted_sha256": "a7b6ad137cc45a14d3235254e0dcb0a236bd2721c15d231e74a6112ea57c64ba",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/daily/report_template.py",
+      "target": "modules/daily/legacy/report_template.py",
+      "source_sha256": "b3c609974f9d33ef2ac4d28236482ddcfa35470ad99e187239046ac454e44ba3",
+      "adapted_sha256": "b3c609974f9d33ef2ac4d28236482ddcfa35470ad99e187239046ac454e44ba3",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/daily/report.css",
+      "target": "modules/daily/legacy/report.css",
+      "source_sha256": "fc275a34a72f6cdc09df5f763ba41909b9fad402664c0f6f389f3fa4e19a3b8b",
+      "adapted_sha256": "fc275a34a72f6cdc09df5f763ba41909b9fad402664c0f6f389f3fa4e19a3b8b",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/work/daily/publish.py",
+      "target": "modules/daily/legacy/publish.py",
+      "source_sha256": "13d30dc2d1e35eec291f17e3349149df7672aec61470ccf91b3907909e86bd73",
+      "adapted_sha256": "dcb2d0e671f93cf6ec0f712c9526b60dd5f31287f1d05ea013b1ac3abe80422c",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/catalog.json",
+      "target": "modules/daily/data/catalog.json",
+      "source_sha256": "4a8084f962c2ea37d42a4b14f4ca7d0a27e59cd8d04b82303e4e61f9f2876dbd",
+      "adapted_sha256": "4a8084f962c2ea37d42a4b14f4ca7d0a27e59cd8d04b82303e4e61f9f2876dbd",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.json",
+      "target": "modules/daily/public/reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.json",
+      "source_sha256": "77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e",
+      "adapted_sha256": "77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.html",
+      "target": "modules/daily/public/reports/2026-09-16/77eebc8150441bbd4bf09afd9741b8b6e57164b46b009fb013c5e07312d8617e/original.html",
+      "source_sha256": "5cc2af97cbb24c80aa74a908277556651284d67173fb6816fbd21b90cddc884f",
+      "adapted_sha256": "5cc2af97cbb24c80aa74a908277556651284d67173fb6816fbd21b90cddc884f",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.json",
+      "target": "modules/daily/public/reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.json",
+      "source_sha256": "5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b",
+      "adapted_sha256": "5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.html",
+      "target": "modules/daily/public/reports/2026-09-11/5a58b21956ca8c4220b8007507e5c07ef2b1b4d4ce2b9a59fb35cb660a2ce21b/original.html",
+      "source_sha256": "62fa140b55c7ced848393d12e7a6cff8b5171819607ac0d32aeee1a50c488684",
+      "adapted_sha256": "62fa140b55c7ced848393d12e7a6cff8b5171819607ac0d32aeee1a50c488684",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.json",
+      "target": "modules/daily/public/reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.json",
+      "source_sha256": "256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4",
+      "adapted_sha256": "256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.html",
+      "target": "modules/daily/public/reports/2026-09-14/256eaf4ebb07911b56d97f354431b5a113bec9c539367fa18262361c762003a4/original.html",
+      "source_sha256": "8590b7da89bf4f6a54be484db958b5b12a485a2b60de3fcaf147ab3d9ecaed6a",
+      "adapted_sha256": "8590b7da89bf4f6a54be484db958b5b12a485a2b60de3fcaf147ab3d9ecaed6a",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.json",
+      "target": "modules/daily/public/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.json",
+      "source_sha256": "af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5",
+      "adapted_sha256": "af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.html",
+      "target": "modules/daily/public/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/original.html",
+      "source_sha256": "b82b8b7a20a53283d8253e5d9c013e3b2fce9d68a2300f295872b44228058079",
+      "adapted_sha256": "b82b8b7a20a53283d8253e5d9c013e3b2fce9d68a2300f295872b44228058079",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/render-history/82a049d00ce1433bdcc95a5f1014601165228c1bd00d42cb142d8de78a4c3f60.html",
+      "target": "modules/daily/public/reports/2026-09-14/af89c6ee63093d9815e9671c670e6d2e029f92bc52ff80303c433c42cf336ce5/render-history/82a049d00ce1433bdcc95a5f1014601165228c1bd00d42cb142d8de78a4c3f60.html",
+      "source_sha256": "82a049d00ce1433bdcc95a5f1014601165228c1bd00d42cb142d8de78a4c3f60",
+      "adapted_sha256": "82a049d00ce1433bdcc95a5f1014601165228c1bd00d42cb142d8de78a4c3f60",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.json",
+      "target": "modules/daily/public/reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.json",
+      "source_sha256": "2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee",
+      "adapted_sha256": "2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.html",
+      "target": "modules/daily/public/reports/2026-09-13/2015e9ea7521c68dbc2f0ad074977caa5c883752e8266ce14edfcafd63e3bfee/original.html",
+      "source_sha256": "314a9642fa5d7cb8a8fd05773cc724fcc0d52c515d88bb91c71fa82b8ce36442",
+      "adapted_sha256": "314a9642fa5d7cb8a8fd05773cc724fcc0d52c515d88bb91c71fa82b8ce36442",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.json",
+      "target": "modules/daily/public/reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.json",
+      "source_sha256": "2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf",
+      "adapted_sha256": "2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf",
+      "source_unchanged_at_check": true
+    },
+    {
+      "source": "/Users/samshi/Documents/Codex/2026-09-06/new-chat/outputs/credit-cycle-dashboard/daily/reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.html",
+      "target": "modules/daily/public/reports/2026-09-15/2100cbdcc7b29781c306e310c164de67d127036594807c22cf3f3feb85ea3ecf/original.html",
+      "source_sha256": "888280434e8ac4745e46641d8ea24c2496c1b11e4247fad7a931f645caa5998e",
+      "adapted_sha256": "888280434e8ac4745e46641d8ea24c2496c1b11e4247fad7a931f645caa5998e",
+      "source_unchanged_at_check": true
+    }
+  ]
+}

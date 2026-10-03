@@ -1,0 +1,45 @@
+export const coreContract = {
+  schemaVersion: 1,
+  apiVersion: 'v1',
+  project: 'investment-workbench-01',
+  status: 'draft_contract',
+  pausedModules: ['daily'],
+  principles: [
+    'module_owned_data',
+    'source_first_evidence',
+    'versioned_artifacts',
+    'read_before_write',
+    'no_false_persistence_claims',
+  ],
+  entityTypes: [
+    { id: 'security', label: '证券/指数/基金', keyFields: ['symbol', 'market', 'assetType'] },
+    { id: 'company', label: '公司主体', keyFields: ['name', 'market', 'identifiers'] },
+    { id: 'macro_metric', label: '宏观与中观指标', keyFields: ['metricId', 'region', 'frequency'] },
+    { id: 'theme', label: '叙事/主题', keyFields: ['themeId', 'version', 'thesisState'] },
+    { id: 'artifact', label: '研究产出', keyFields: ['artifactId', 'module', 'version'] },
+  ],
+  sourceRecord: {
+    required: ['sourceId', 'title', 'tier', 'retrievedAt', 'asOfDate', 'urlOrPath', 'hash', 'moduleOwner'],
+    tiers: ['S0_official', 'S1_provider', 'S2_research', 'S3_derived'],
+    notes: '事实核验和观点验证分开记录；低层级来源不能覆盖高层级原始证据。',
+  },
+  artifactRecord: {
+    required: ['artifactId', 'module', 'title', 'version', 'createdAt', 'sourceIds', 'status', 'storageRef'],
+    statuses: ['draft', 'reviewed', 'published', 'superseded', 'archived'],
+    notes: 'artifact是模块之间交换的最小稳定单位；正文可在模块内，跨模块只依赖索引和storageRef。',
+  },
+  taskRecord: {
+    required: ['taskId', 'module', 'intent', 'status', 'createdAt', 'updatedAt', 'inputs', 'outputs'],
+    statuses: ['queued', 'running', 'blocked', 'completed', 'failed', 'cancelled'],
+    notes: '长任务后续独立进程化；当前契约先固定状态机和审计字段。',
+  },
+  moduleBoundaries: [
+    { module: 'observatory', owns: ['research-config', 'narratives', 'evidence_backups'], exposes: ['config', 'sources'], writes: 'browser_local_only' },
+    { module: 'research', owns: ['skill_registry_index', 'report_artifact_index'], exposes: ['skills', 'workflows', 'artifacts'], writes: 'none_currently' },
+    { module: 'factors', owns: ['factor_definitions', 'snapshots', 'experiments'], exposes: [], writes: 'not_connected' },
+    { module: 'knowledge', owns: ['documents', 'citations', 'retrieval_index'], exposes: [], writes: 'not_connected' },
+    { module: 'portfolio', owns: ['paper_positions', 'decision_ledger', 'reviews'], exposes: [], writes: 'not_connected' },
+    { module: 'lance', owns: ['profile', 'missions', 'advisory_flows'], exposes: [], writes: 'not_connected' },
+    { module: 'daily', owns: ['archived_reports'], exposes: ['historical_snapshot_only'], writes: 'paused' },
+  ],
+};

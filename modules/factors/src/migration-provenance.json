@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "module": "factors",
+  "date": "2026-10-01",
+  "items": [
+    {
+      "target": "modules/factors/src/dca_engine.py:xirr",
+      "source": "/Users/samshi/Desktop/My Claude/etf-smartbeta/src/report.py:xirr",
+      "sourceFileSha256": "8680a92b9aa95b2238f6f8799565be53fce9946aa5aee80751b48d840b3575a1",
+      "adaptations": [
+        "Return JSON null instead of NaN for missing solutions and zero-duration cashflows.",
+        "Keep the original -0.95 to 3.0 annual-rate bounds and 200 bisection iterations.",
+        "Report a result warning when no solution exists within those bounds."
+      ],
+      "sourcePolicy": "read_only_no_old_script_execution"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+ID,模块,能力,原实现,复用方式,验收重点,状态,目标目录（建议）,独立启动入口,依赖与条件,验收证据（待取得）
+L01,Lance,画像与引导,onboarding/profile/field-registry,完整复制适配,问答算分/字段来源/演示边界,待复制,modules/lance,npm run dev/build/start（原脚本，复制后验证）,Node/npm与内容JSON；现原型不依赖外部密钥,原路由回归截图、API测试、状态导出恢复记录
+L02,Lance,内容圈与Mission,content/nodes + mission + node-state,完整复制适配,4节点/5步交互/状态导出恢复,待复制,modules/lance,npm run dev/build/start（原脚本，复制后验证）,Node/npm与内容JSON；现原型不依赖外部密钥,原路由回归截图、API测试、状态导出恢复记录
+L03,Lance,C端页面与4API,app + lib/local-state,保留当前行为并标记原型,路由/资源前缀/输入校验/错误,待复制,modules/lance,npm run dev/build/start（原脚本，复制后验证）,Node/npm与内容JSON；现原型不依赖外部密钥,原路由回归截图、API测试、状态导出恢复记录
+L04,Lance,服务产出与交付,无完整现实现,新增领域能力,来源关联/审核/内容版本/权限,待设计,modules/lance,npm run dev/build/start（原脚本，复制后验证）,Node/npm与内容JSON；现原型不依赖外部密钥,原路由回归截图、API测试、状态导出恢复记录
+R01,研究生产,14 Skill文件与注册,.claude/skills + skills.js,定义全量保留,文件哈希/注册状态/名称映射,待复制,modules/research,server npm start；须先禁用启动后台副作用,Node SQLite、Python/AKShare、Longbridge和OpenRouter配置,任务/报告/监控/组合行为回归和产出哈希
+R02,研究生产,执行循环与4工具,runSkill/longbridge/akshare/documents,适配复用,工具权限/用量/取消/失败/报告,待复制,modules/research,server npm start；须先禁用启动后台副作用,Node SQLite、Python/AKShare、Longbridge和OpenRouter配置,任务/报告/监控/组合行为回归和产出哈希
+R03,研究生产,任务/报告/23API,index.js/tasks.js/webapp,前台保留后台渐进改造,任务恢复/报告不覆盖/原流程,待复制,modules/research,server npm start；须先禁用启动后台副作用,Node SQLite、Python/AKShare、Longbridge和OpenRouter配置,任务/报告/监控/组合行为回归和产出哈希
+R04,研究生产,监控与外部信号,monitor/feedhub,适配复用,阈值状态/缺失值/同步水位,待复制,modules/research,server npm start；须先禁用启动后台副作用,Node SQLite、Python/AKShare、Longbridge和OpenRouter配置,任务/报告/监控/组合行为回归和产出哈希
+O01,观察台,指数风格四维信号,build/expand/research-config,完整继承,16指数/10风格/20组/口径适用性,待复制,modules/observatory,配置化Python build + 独立静态HTTP服务（待适配）,Python、静态资源；真实行情后续接入,配置清单对账、交互回归、导入导出哈希
+O02,观察台,宏观到公司叙事,app/complete,完整继承,40指标/38公司/5链/7叙事/6面板,待复制,modules/observatory,配置化Python build + 独立静态HTTP服务（待适配）,Python、静态资源；真实行情后续接入,配置清单对账、交互回归、导入导出哈希
+O03,观察台,证据与本地版本,app/complete localStorage,导出导入再接持久化,历史保留/迁域恢复/真实示例隔离,待复制,modules/observatory,配置化Python build + 独立静态HTTP服务（待适配）,Python、静态资源；真实行情后续接入,配置清单对账、交互回归、导入导出哈希
+F01,因子实验室,完整页面和研究诊断,make_app/factor_lab_ui/out,完整复制适配,全部控件/曲线/对比/留一法/敏感性,待复制,modules/factors,完整Python产物流水线 + 独立静态HTTP服务（待补启动清单）,Python包环境、5类JSON/快照；抓取凭据按配置,同快照双引擎逐期对账、诊断与交互记录
+F02,因子实验室,定投和满仓两引擎,backtest/validate_panel_engine/_core,分别保留,同快照逐期对账/现金流口径区分,待复制,modules/factors,完整Python产物流水线 + 独立静态HTTP服务（待补启动清单）,Python包环境、5类JSON/快照；抓取凭据按配置,同快照双引擎逐期对账、诊断与交互记录
+F03,因子实验室,因子登记和数据底座,factor_registry/factors/fund_data,版本化适配,同列槽位/权重/缺失掩码/快照,待复制,modules/factors,完整Python产物流水线 + 独立静态HTTP服务（待补启动清单）,Python包环境、5类JSON/快照；抓取凭据按配置,同快照双引擎逐期对账、诊断与交互记录
+K01,知识,原文/导航/231切片,金融知识库RAG,按清单复制内容,ID/哈希/来源/数量/排除备份,待范围确认,modules/knowledge,原HTML阅读；查询API尚待建设,原资料授权与副本、JSONL；后续索引环境,数量/哈希/来源验证、固定问题集检索评估
+K02,知识,检索接口,尚无线上RAG服务,新增,固定问题集/引用/过期/无证据,待设计,modules/knowledge,原HTML阅读；查询API尚待建设,原资料授权与副本、JSONL；后续索引环境,数量/哈希/来源验证、固定问题集检索评估
+D01,日报,固定渲染和归档查询,publish/template/css/sync_daily/daily.js,完整复用并解耦,同JSON/原样式/版次/哈希查询,待复制,modules/daily,Python发布/渲染；采集由Agent执行（待配置化）,只读数据源、模板、草稿、归档；离线测试用fixture,同JSON渲染、归档哈希、截止和幂等验证
+D02,日报,真实取证调度与发布任务,Agent真实取证 + publish.py,保留生产路径逐步服务化,唯一发布者/实际截止/幂等/失败状态,待设计,modules/daily,Python发布/渲染；采集由Agent执行（待配置化）,只读数据源、模板、草稿、归档；离线测试用fixture,同JSON渲染、归档哈希、截止和幂等验证
+E01,执行,组合和基础回测,portfolios/backtest + Lance trade,先保留多场景,引擎标识/简化假设/无真实下单,待复制,modules/execution + 原模块适配器,当前通过research/lance入口；统一账本未实现,不同模拟引擎及数据；未来账本服务,场景标记、资金流水对账、幂等和复盘引用
+E02,执行,统一模拟账本复盘,无统一实现,新增,流水对账/冲销/幂等/判断引用,待设计,modules/execution + 原模块适配器,当前通过research/lance入口；统一账本未实现,不同模拟引擎及数据；未来账本服务,场景标记、资金流水对账、幂等和复盘引用
+H01,信息源,Feed内容采集/FTS/3MCP,feed-hub,按依赖接入，不默认迁整站,来源/分页水位/只读权限,待范围确认,adapters/feed-hub；原Feed服务先独立,原Next脚本或stdio MCP入口，凭据另验,SQLite/内容源；处理模型和转写/Drive配置按需,分页水位、只读权限、来源与失败测试
+D03,日报,离线状态规则验证资产,engine/didi.py synthetic-only,仅离线测试保留,拒绝真实输入/状态与Ledger确定性测试,待复制,modules/daily,engine/didi.py原离线测试入口，具体命令复制时验证,synthetic fixture、状态及Ledger测试输入；不依赖在线取证,真实输入拒绝测试、确定性输出、幂等/状态迁移及Ledger一致性记录

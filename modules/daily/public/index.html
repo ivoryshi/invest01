@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投资早晚报 · 归档阅读</title>
+<link rel="stylesheet" href="./styles.css">
+<script src="./app.js" defer></script>
+</head>
+<body>
+<div class="daily-shell">
+  <aside class="daily-side"><a href="/" class="back">← 投研工作台01</a><h1>投资早晚报</h1><p>按发布时点保留原始报告、哈希、质量状态和来源。当前为本地归档快照，尚未接入自动同步。</p><form id="filters"><label>日期<input type="date" name="date"></label><label>版次<select name="mode"><option value="ALL">全部</option><option value="AM">早报</option><option value="PM">晚报</option></select></label><label>关键词<input type="search" name="q" placeholder="标题、公司、来源或信号"></label><button type="submit">查询</button><button type="button" id="clear">清除</button></form></aside>
+  <main><section id="summary"></section><section class="daily-grid"><div id="list"></div><article id="detail"></article></section></main>
+</div>
+</body>
+</html>
