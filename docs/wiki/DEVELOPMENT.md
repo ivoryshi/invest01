@@ -1,6 +1,6 @@
 # 开发与验收
 
-当前v0.5.1，Node基线24.14.0（.nvmrc），ES Modules、原生HTTP与浏览器模块，零npm第三方依赖，无需npm install。package.json还声明支持22.23.1以上22.x，但本批没有重做双版本矩阵。Python执行依赖与版本见[requirements](../../modules/factors/requirements.txt)。
+当前v0.5.2，Node基线24.14.0（.nvmrc），ES Modules、原生HTTP与浏览器模块，零npm第三方依赖，无需npm install。package.json还声明支持22.23.1以上22.x，但本批没有重做双版本矩阵。Python执行依赖与版本见[requirements](../../modules/factors/requirements.txt)。
 
 ## 目录与责任
 

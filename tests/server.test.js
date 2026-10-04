@@ -597,6 +597,7 @@ test('local API and public asset boundaries', async t => {
   await t.test('fund database profile and fixed basket execution bind imported sources', async () => {
     const paths = [factorConfigsPath, factorRunRequestsPath, factorResultArtifactsPath], originals = [];
     for (const file of paths) originals.push(await readFile(file, 'utf8'));
+    const root = await mkdtemp(path.join(os.tmpdir(), 'fund-selected-snapshot-'));
     try {
       const prefix = '/api/modules/factors/v1';
       const catalog = await request(server, `${prefix}/fund-nav/catalog?q=014165`);
@@ -626,6 +627,36 @@ test('local API and public asset boundaries', async t => {
       assert.equal(result.attribution.daily.length, result.accountLedger.length);
       assert.ok(Math.abs(result.attribution.reconciliation.error) < 1e-6);
       assert.ok(result.cashFlows.every(x => Math.abs(Object.values(x.allocations).reduce((a,b) => a+b,0)-x.amount) < 1e-8));
+      assert.equal(result.dataScope.temporalEligibility.historicalFactorSelectionAllowed, false);
+      const store = createFrozenSnapshotStore({ root, candidates: factorSnapshotCandidates, assets: factorDataAssets });
+      const frozenServer = createServer({ snapshotStore: store });
+      const captured = await request(frozenServer, `${prefix}/snapshots/frozen`, { method: 'POST', body: JSON.stringify({ baseSnapshotId: config.snapshotId,
+        selection: { codes: ['014165', '021847'], benchmarkId: config.benchmarkId, sourceVersions: profile.sourceVersions } }) });
+      assert.equal(captured.status, 201, captured.text().slice(0,500));
+      const frozenId = captured.json().snapshotId;
+      const manifestPath = path.join(root, frozenId, 'manifest.json'), receipt = await readFile(manifestPath, 'utf8');
+      const altered = JSON.parse(receipt); altered.captureSources[0].sha256 = '0'.repeat(64);
+      await chmod(manifestPath, 0o600); await writeFile(manifestPath, JSON.stringify(altered));
+      await assert.rejects(store.verify(frozenId), /invalid_frozen_snapshot_manifest/);
+      await writeFile(manifestPath, receipt);
+      const frozenProfile = await request(frozenServer, `${prefix}/fund-nav/profile?codes=014165,021847&benchmarkId=CSI300&snapshotId=${frozenId}`);
+      assert.equal(frozenProfile.status, 200, frozenProfile.text().slice(0,500));
+      assert.deepEqual(frozenProfile.json().sourceVersions, profile.sourceVersions);
+      assert.equal(frozenProfile.json().snapshotId, frozenId);
+      assert.equal((await request(frozenServer, `${prefix}/fund-nav/profile?codes=014165&benchmarkId=CSI300&snapshotId=${frozenId}`)).status, 422);
+      assert.equal((await request(frozenServer, `${prefix}/fund-nav/profile?codes=000001&benchmarkId=CSI300&snapshotId=${frozenId}`)).status, 422);
+      config.snapshotId = frozenId; await save();
+      const replay = await request(frozenServer, `${prefix}/run-requests/${created.json().item.requestId}/execute`, { method: 'POST' });
+      assert.equal(replay.status, 200, replay.text().slice(0,500));
+      for (const key of ['metrics', 'accountLedger', 'cashFlows', 'attribution']) assert.deepEqual(replay.json().resultArtifact[key], result[key]);
+      assert.deepEqual(replay.json().resultArtifact.dataScope.frozenSnapshot.selection.codes, ['014165', '021847']);
+      const countBeforeDamage = (await request(server, `${prefix}/result-artifacts`)).json().count;
+      const { storageRef } = await store.resolve(frozenId, 'factors.fund_warehouse.nav_db');
+      await chmod(storageRef, 0o600); await writeFile(storageRef, 'damaged');
+      assert.equal((await request(frozenServer, `${prefix}/fund-nav/profile?codes=014165&benchmarkId=CSI300&snapshotId=${frozenId}`)).status, 409);
+      assert.equal((await request(frozenServer, `${prefix}/run-requests/${created.json().item.requestId}/execute`, { method: 'POST' })).status, 409);
+      assert.equal((await request(server, `${prefix}/result-artifacts`)).json().count, countBeforeDamage);
+      config.snapshotId = template.snapshotId; await save();
       config.strategySettings.amount *= 2; await save();
       const larger = await execute(); assert.equal(larger.status, 200);
       assert.ok(Math.abs(larger.json().resultArtifact.metrics.finalValue - 2*result.metrics.finalValue) < .0001);
@@ -641,10 +672,10 @@ test('local API and public asset boundaries', async t => {
       assert.equal((await request(server, `${prefix}/result-artifacts`)).json().count, count);
       assert.equal((await request(server, `${prefix}/fund-nav/profile?codes=../x&benchmarkId=CSI300`)).status, 422);
       assert.equal((await request(server, `${prefix}/fund-nav/profile?codes=000000&benchmarkId=CSI300`)).status, 422);
-      assert.ok(!(await request(server, `${prefix}/snapshots/frozen`)).json().freezeOptions.some(x => x.baseSnapshotId === config.snapshotId));
+      assert.equal((await request(server, `${prefix}/snapshots/frozen`)).json().freezeOptions.find(x => x.baseSnapshotId === config.snapshotId).selectionRequired, true);
       assert.equal((await request(server, `${prefix}/snapshots/frozen`, { method: 'POST', body: JSON.stringify({ baseSnapshotId: config.snapshotId }) })).status, 422);
       assert.equal((await request(server, '/var/factors/fund-history.sqlite')).status, 404);
-    } finally { for (let i=0; i<paths.length; i++) await writeFile(paths[i], originals[i]); }
+    } finally { for (let i=0; i<paths.length; i++) await writeFile(paths[i], originals[i]); await rm(root, { recursive: true, force: true }); }
   });
   await t.test('factor data layer schema probe reads bounded headers and panel structure', async () => {
     const schema = (await request(server, '/api/modules/factors/v1/data-layer/schema')).json();

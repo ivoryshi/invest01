@@ -34,11 +34,24 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def open_reader(database):
+def open_reader(database, expected_sha256=None):
     file = Path(database)
     if file.is_symlink() or not file.is_file():
         raise ValueError('fund_history_database_not_imported')
-    db = sqlite3.connect(file.resolve().as_uri() + '?mode=ro', uri=True, timeout=30)
+    if expected_sha256 is not None:
+        raw, sha = read_file(file, 64*1024*1024)
+        if sha != expected_sha256:
+            raise ValueError('frozen_snapshot_integrity_failed')
+        # Deserialize precisely the bytes hashed above, avoiding a verify/open path replacement race.
+        db = sqlite3.connect(':memory:')
+        try:
+            db.deserialize(raw)
+            db.execute('PRAGMA query_only=ON')
+        except Exception:
+            db.close()
+            raise
+    else:
+        db = sqlite3.connect(file.resolve().as_uri() + '?mode=ro', uri=True, timeout=30)
     db.row_factory = sqlite3.Row
     try:
         if db.execute("SELECT value FROM store_meta WHERE key='schema_version'").fetchone()[0] != str(SCHEMA_VERSION):
@@ -58,9 +71,16 @@ def status(db):
     totals = db.execute("SELECT kind, COUNT(*) AS files, SUM(observations) AS rows, MIN(start_date) AS start, MAX(end_date) AS end FROM sources GROUP BY kind").fetchall()
     last = db.execute('SELECT * FROM import_runs ORDER BY run_id DESC LIMIT 1').fetchone()
     errors = [] if last is None else [dict(row) for row in db.execute('SELECT source_id, message FROM import_errors WHERE run_id=? ORDER BY source_id LIMIT 20', (last['run_id'],))]
-    return {'schemaVersion': SCHEMA_VERSION, 'storage': 'workbench_sqlite', 'sources': [dict(row) for row in totals],
+    selection_row = db.execute("SELECT value FROM store_meta WHERE key='snapshot_selection'").fetchone()
+    selection = json.loads(selection_row[0]) if selection_row else None
+    summaries = [dict(row) for row in totals]
+    if selection:
+        for row in summaries:
+            if row['kind'] == 'universe':
+                row['rows'] = len(selection['codes'])
+    return {'schemaVersion': SCHEMA_VERSION, 'storage': 'workbench_sqlite', 'sources': summaries,
             'lastImport': dict(last) if last else None, 'rejectedSample': errors,
-            'policy': 'offline_explicit_import_no_fetch_old_csv_readonly'}
+            'selection': selection, 'policy': 'selected_snapshot_source_receipts_not_full_universe' if selection else 'offline_explicit_import_no_fetch_old_csv_readonly'}
 
 
 def source(db, source_id):

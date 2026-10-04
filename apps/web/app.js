@@ -461,6 +461,8 @@ let editIndustryConfig = null;
 let refreshThreeBucketSnapshotChoices = null;
 let editThreeBucketConfig = null;
 let editFundNavConfig = null;
+let refreshFundNavSnapshotChoices = null;
+let refreshFrozenSnapshotList = null;
 let editExpressionFactor = null;
 let editExpressionConfig = null;
 
@@ -487,7 +489,7 @@ async function frozenSnapshotPanel() {
     if (!response.ok) throw new Error(data.error || '冻结快照读取失败');
     const selected = form.elements.baseSnapshotId.value;
     form.elements.baseSnapshotId.replaceChildren();
-    data.freezeOptions.forEach(item => form.elements.baseSnapshotId.append(option(item.baseSnapshotId, item.title)));
+    data.freezeOptions.filter(item => !item.selectionRequired).forEach(item => form.elements.baseSnapshotId.append(option(item.baseSnapshotId, item.title)));
     if (selected) form.elements.baseSnapshotId.value = selected;
     list.replaceChildren();
     if (!data.items.length) list.append(element('p', '尚无冻结版本。', 'next'));
@@ -519,11 +521,12 @@ async function frozenSnapshotPanel() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '冻结失败');
       message.textContent = `已冻结并校验：${data.snapshotId}`;
-      await renderList(); await refreshDcaSnapshotChoices?.(); await refreshFundSnapshotChoices?.(); await refreshIndustrySnapshotChoices?.(); await refreshThreeBucketSnapshotChoices?.();
+      await renderList(); await refreshDcaSnapshotChoices?.(); await refreshFundSnapshotChoices?.(); await refreshIndustrySnapshotChoices?.(); await refreshThreeBucketSnapshotChoices?.(); await refreshFundNavSnapshotChoices?.();
     } catch (error) { message.textContent = error.message; }
     finally { submit.disabled = false; }
   });
-  panel.append(form, message, element('p', '只复制已登记CSV与Parquet，单次总量上限64MiB。原始行业回测包包含行业表、基准和可投资名单；旧行业面板版本仅供归档。冻结时间不是数据截止日，本地副本不是外部备份。', 'next'), list);
+  refreshFrozenSnapshotList = async () => { if (panel.isConnected) await renderList(); };
+  panel.append(form, message, element('p', '单次冻结上限64MiB。基金数据库须在基金配置中绑定选定份额与基准后冻结，不复制整库。冻结时间不是数据截止日或历史可得时间，本地副本不是外部备份。', 'next'), list);
   try { await renderList(); } catch (error) { message.textContent = error.message; }
   return panel;
 }
@@ -1782,13 +1785,21 @@ async function threeBucketConfigPanel(library) {
 async function fundNavConfigPanel() {
   const panel = element('section', null, 'strategy-config-workbench'); panel.id = 'fund-nav-config';
   panel.append(element('h2', '基金历史净值定投'));
-  const optionsResponse = await fetch('/api/modules/factors/v1/fund-nav/catalog');
+  const baseSnapshotId = 'snapshot.fund_warehouse.nav_db.current';
+  const picker = document.createElement('select'); picker.name = 'snapshotId';
+  await populateSnapshotSelect(picker, baseSnapshotId);
+  let optionsResponse = await fetch('/api/modules/factors/v1/fund-nav/catalog');
+  if (!optionsResponse.ok) {
+    const fallback = [...picker.options].find(o => o.value !== baseSnapshotId && o.value.startsWith('snapshot.frozen.'));
+    if (fallback) { picker.value = fallback.value; optionsResponse = await fetch(`/api/modules/factors/v1/fund-nav/catalog?snapshotId=${encodeURIComponent(picker.value)}`); }
+  }
+  const initialSnapshotId = picker.value;
   if (!optionsResponse.ok) { panel.append(element('p', '基金历史数据库未就绪。', 'warning')); return panel; }
   const options = await optionsResponse.json();
   const db = options.database;
   if (db) {
     const imported = db.lastImport;
-    panel.append(element('p', `SQLite · ${imported?.status || '未导入'} · 本批导入${imported?.imported ?? 0} / 未变${imported?.skipped ?? 0} / 拒绝${imported?.rejected ?? 0}`),
+    panel.append(element('p', db.selection ? 'SQLite · 冻结选定源（原始导入凭证，不含全库导入记录）' : `SQLite · ${imported?.status || '未导入'} · 本批导入${imported?.imported ?? 0} / 未变${imported?.skipped ?? 0} / 拒绝${imported?.rejected ?? 0}`),
       resultDiagnosticTable('数据库历史覆盖', ['数据', '来源数', '观测数', '起点', '终点'], db.sources.map(s => [s.kind, s.files, s.rows, s.start || '-', s.end || '-'])));
     if (db.rejectedSample.length) panel.append(resultDiagnosticTable('最近导入异常（最多20条）', ['来源', '原因'], db.rejectedSample.map(s => [s.source_id, s.message])));
   }
@@ -1803,6 +1814,8 @@ async function fundNavConfigPanel() {
     input.required = name !== 'savedConfig'; label.append(input); grid.append(label); controls[name] = input; return input;
   }
   field('savedConfig', '已保存配置', 'text', [['', '新配置']]); field('configId', '配置ID'); field('title', '标题');
+  const versionLabel = element('label', '基金净值数据版本'); versionLabel.append(picker); grid.append(versionLabel); controls.snapshotId = picker;
+  refreshFundNavSnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(picker, baseSnapshotId); };
   field('benchmarkId', '显式单指数基准', 'text', options.benchmarks.map(id => [id, id]));
   field('startDate', '开始日期', 'date'); field('endDate', '结束日期', 'date'); field('amount', '每笔投入金额', 'number');
   field('frequency', '投入频率', 'text', [['monthly', '月度'], ['weekly', '每7日'], ['biweekly', '每14日']]);
@@ -1819,13 +1832,15 @@ async function fundNavConfigPanel() {
   const read = element('button', '读取数据库净值与基准'); read.type = 'button';
   const submit = element('button', '保存基金历史配置'); submit.type = 'submit';
   const fresh = element('button', '新建配置'); fresh.type = 'button';
+  const freeze = element('button', '冻结已绑定基金数据'); freeze.type = 'button';
   const message = element('p', '', 'form-message'); message.setAttribute('role', 'status'); const profileView = element('section');
-  form.append(grid, catalogArea, basket, notesLabel, element('p', '手动固定份额篮子，不按最新因子挑选历史标的。净值已含日常费用，不重复扣年费；申购与滑点为假设。基准为同现金流毛指数，复权净值份额不是实际申购确认。', 'next'), read, submit, fresh, message, profileView); panel.append(form);
-  let editingId = null, generation = 0, editSession = 0, loading = false, profiling = false, saving = false, binding = null;
+  form.append(grid, catalogArea, basket, notesLabel, element('p', '手动固定份额篮子，不按最新因子挑选历史标的。净值已含日常费用，不重复扣年费；申购与滑点为假设。基准为同现金流毛指数，复权净值份额不是实际申购确认。', 'next'), read, freeze, submit, fresh, message, profileView); panel.append(form);
+  let editingId = null, generation = 0, editSession = 0, loading = false, profiling = false, saving = false, freezing = false, selecting = false, binding = null;
   const occupiedIds = new Set();
   function syncButtons() {
-    submit.disabled = loading || profiling || saving || !binding; read.disabled = loading || profiling;
-    [controls.benchmarkId, add, equal].forEach(control => { control.disabled = loading; });
+    submit.disabled = loading || profiling || saving || freezing || selecting || !binding; read.disabled = loading || profiling || freezing || selecting;
+    freeze.disabled = loading || profiling || saving || freezing || selecting || !binding || picker.value !== baseSnapshotId;
+    [picker, controls.benchmarkId, add, equal].forEach(control => { control.disabled = loading || freezing || selecting; });
   }
   function invalidate() { generation += 1; binding = null; profiling = false; profileView.replaceChildren(); syncButtons(); }
   function drawBasket(shares) {
@@ -1842,7 +1857,9 @@ async function fundNavConfigPanel() {
   search.addEventListener('click', async () => {
     search.disabled = true;
     try {
-      const response = await fetch(`/api/modules/factors/v1/fund-nav/catalog?q=${encodeURIComponent(query.value.trim())}`); const data = await response.json();
+      const id = picker.value;
+      const response = await fetch(`/api/modules/factors/v1/fund-nav/catalog?q=${encodeURIComponent(query.value.trim())}&snapshotId=${encodeURIComponent(id)}`); const data = await response.json();
+      if (id !== picker.value) return;
       if (!response.ok) throw new Error(data.error || '查询失败');
       choices.replaceChildren(option('', '选择份额'));
       data.items.forEach(item => choices.append(option(item.shareCode, `${item.shareCode} ${item.shareName}${item.historyAvailable ? '' : '（历史缺失）'}`)));
@@ -1858,6 +1875,19 @@ async function fundNavConfigPanel() {
   });
   equal.addEventListener('click', () => { if (!loading) rows.forEach(row => { row.weight.value = 1 / rows.length; }); });
   controls.benchmarkId.addEventListener('change', () => { if (!loading) invalidate(); });
+  picker.addEventListener('change', async () => {
+    invalidate(); const sent = generation; selecting = true; syncButtons(); choices.replaceChildren();
+    try {
+      const response = await fetch(`/api/modules/factors/v1/fund-nav/catalog?snapshotId=${encodeURIComponent(picker.value)}`), data = await response.json();
+      if (generation !== sent) return;
+      if (!response.ok) throw new Error(data.error || '数据版本不可用');
+      const previous = controls.benchmarkId.value;
+      controls.benchmarkId.replaceChildren(...data.benchmarks.map(id => option(id, id)));
+      controls.benchmarkId.value = data.benchmarks.includes(previous) ? previous : data.benchmarks[0] || '';
+      message.textContent = '数据版本已切换，请重新读取净值与基准。';
+    } catch (error) { if (generation === sent) message.textContent = error.message; }
+    finally { if (generation === sent) { selecting = false; syncButtons(); } }
+  });
   query.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); search.click(); } });
   manual.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); add.click(); } });
   function renderSaved() {
@@ -1867,7 +1897,10 @@ async function fundNavConfigPanel() {
     controls.savedConfig.value = loading ? selected : editingId || '';
   }
   function fill(item) {
-    generation += 1; editSession += 1; loading = profiling = false; editingId = item.configId || null;
+    generation += 1; editSession += 1; loading = profiling = selecting = false; editingId = item.configId || null;
+    const snapshotId = item.snapshotId || baseSnapshotId;
+    if (![...picker.options].some(o => o.value === snapshotId)) picker.append(option(snapshotId, `原配置版本：${snapshotId}`));
+    picker.value = snapshotId;
     let id = 'config.fund_nav_manual', index = 2; while (configs.items.some(x => x.configId === id) || occupiedIds.has(id)) id = `config.fund_nav_manual_${index++}`;
     controls.configId.value = editingId || id; controls.title.value = item.title;
     if (![...controls.benchmarkId.options].some(o => o.value === item.benchmarkId)) controls.benchmarkId.append(option(item.benchmarkId, `原配置：${item.benchmarkId}`));
@@ -1892,10 +1925,10 @@ async function fundNavConfigPanel() {
   };
   controls.savedConfig.addEventListener('change', () => editFundNavConfig({ configId: controls.savedConfig.value })); fresh.addEventListener('click', () => fill(template));
   read.addEventListener('click', async () => {
-    if (loading || profiling || !rows.length) { message.textContent = '先选择基金份额。'; return; }
+    if (loading || profiling || freezing || selecting || !rows.length) { message.textContent = '先选择基金份额。'; return; }
     const sent = ++generation; binding = null; profiling = true; syncButtons();
     try {
-      const params = new URLSearchParams({ codes: rows.map(r => r.code).join(','), benchmarkId: controls.benchmarkId.value });
+      const params = new URLSearchParams({ codes: rows.map(r => r.code).join(','), benchmarkId: controls.benchmarkId.value, snapshotId: picker.value });
       const response = await fetch(`/api/modules/factors/v1/fund-nav/profile?${params}`), data = await response.json();
       if (generation !== sent) return;
       if (!response.ok) throw new Error(data.error || '历史读取失败');
@@ -1904,19 +1937,34 @@ async function fundNavConfigPanel() {
       if (controls.endDate.value > data.commonEndDate || controls.endDate.value <= controls.startDate.value) controls.endDate.value = data.commonEndDate;
       profileView.replaceChildren(element('p', `共同区间 ${data.commonStartDate} → ${data.commonEndDate} · ${data.commonObservations}观测 · 基准${data.benchmark.id}/${data.benchmark.kind} · 复权${data.adjustmentMethod}`),
         resultDiagnosticTable('选定数据库历史', ['份额', '名称', '起点', '终点', '观测数', '复权'], data.funds.map(f => [f.shareCode, f.shareName, f.startDate, f.endDate, f.observations, f.adjustmentMethod])));
-      message.textContent = '已绑定数据库导入版本；共同区间受基准覆盖限制。';
+      message.textContent = data.frozenSnapshot ? '已绑定冻结数据版本；共同区间受基准覆盖限制。' : '已绑定数据库导入版本；共同区间受基准覆盖限制。';
     } catch (error) { if (generation === sent) message.textContent = error.message; }
     finally { if (generation === sent) { profiling = false; syncButtons(); } }
   });
+  freeze.addEventListener('click', async () => {
+    if (loading || profiling || saving || freezing || selecting || !binding || picker.value !== baseSnapshotId) return;
+    const sent = generation; freezing = true; syncButtons();
+    try {
+      const selection = { codes: rows.map(row => row.code), benchmarkId: controls.benchmarkId.value, sourceVersions: binding };
+      const response = await fetch('/api/modules/factors/v1/snapshots/frozen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ baseSnapshotId, title: controls.title.value.trim(), selection }) }), data = await response.json();
+      if (!response.ok) throw new Error(data.error || '冻结失败');
+      await populateSnapshotSelect(picker, baseSnapshotId);
+      if (sent !== generation) return;
+      picker.value = data.snapshotId;
+      message.textContent = `已绑定冻结版本：${data.snapshotId}；配置尚未保存。`;
+      await refreshFrozenSnapshotList?.();
+    } catch (error) { if (sent === generation) message.textContent = error.message; }
+    finally { freezing = false; syncButtons(); }
+  });
   form.addEventListener('submit', async event => {
-    event.preventDefault(); if (loading || profiling || saving || !binding) return;
+    event.preventDefault(); if (loading || profiling || saving || freezing || selecting || !binding) return;
     const signature = () => JSON.stringify({ fields: Object.fromEntries(Object.entries(controls).filter(([key]) => key !== 'savedConfig').map(([key, field]) => [key, field.value])), notes: notes.value, shares: rows.map(r => [r.code, r.weight.value]) });
     const submittedSignature = signature();
     const shares = rows.map(r => ({ shareCode: r.code, weight: Number(r.weight.value) }));
     if (!shares.length || shares.some(r => !Number.isFinite(r.weight) || r.weight <= 0) || Math.abs(shares.reduce((n, r) => n+r.weight, 0)-1) > 1e-8) { message.textContent = '份额投入比例必须为正且合计1。'; return; }
     const configId = controls.configId.value.trim(), sent = generation, session = editSession, method = industrySaveMethod(editingId, configId);
     const strategySettings = { ...options.defaults, shares, sourceVersions: binding, startDate: controls.startDate.value, endDate: controls.endDate.value, amount: Number(controls.amount.value), frequency: controls.frequency.value, maxGapDays: Number(controls.maxGapDays.value) };
-    const payload = { ...template, configId, title: controls.title.value.trim(), notes: notes.value, benchmarkId: controls.benchmarkId.value, rebalanceCalendar: strategySettings.frequency, strategySettings, costModel: `subscription=${controls.subscription.value};slippage=${controls.slippage.value}` };
+    const payload = { ...template, configId, snapshotId: picker.value, title: controls.title.value.trim(), notes: notes.value, benchmarkId: controls.benchmarkId.value, rebalanceCalendar: strategySettings.frequency, strategySettings, costModel: `subscription=${controls.subscription.value};slippage=${controls.slippage.value}` };
     saving = true; if (method === 'POST') occupiedIds.add(configId); syncButtons();
     try {
       const response = await fetch(method === 'PUT' ? `/api/modules/factors/v1/experiment-configs/${encodeURIComponent(configId)}` : '/api/modules/factors/v1/experiment-configs', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); const data = await response.json();
@@ -1925,7 +1973,7 @@ async function fundNavConfigPanel() {
       if (response.ok) { configs = await (await fetch('/api/modules/factors/v1/experiment-configs')).json(); renderSaved(); await refreshFactorExecution?.(); }
     } catch { if (generation === sent) message.textContent = '保存失败。'; } finally { saving = false; syncButtons(); }
   });
-  fill(template); return panel;
+  fill({ ...template, snapshotId: initialSnapshotId }); return panel;
 }
 
 async function strategyConfigWorkbenchPanel(library) {
@@ -3133,7 +3181,7 @@ try {
   async function render() {
     if (cleanup) cleanup();
     cleanup = null;
-    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; editExpressionFactor = null; editExpressionConfig = null;
+    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; editExpressionFactor = null; editExpressionConfig = null;
     const selected = items.find(item => item.id === location.hash.slice(1)) || items[0];
     for (const a of nav.children) {
       if (a.hash === `#${selected.id}`) a.setAttribute('aria-current', 'page');

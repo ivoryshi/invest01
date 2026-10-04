@@ -1,14 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { executePinnedPython } from './pinned-python.js';
 
 const maxBytes = 64 * 1024 * 1024;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 422) => Object.assign(new Error(message), { status });
 export const frozenSnapshotIdValid = value => /^snapshot\.frozen\.[a-f0-9]{64}$/.test(value || '');
 
-// Only these data files are eligible; scripts and live SQLite stores are excluded.
+export const fundNavSnapshotId = 'snapshot.fund_warehouse.nav_db.current';
+// The SQLite binding exports a selected transaction, never copies the live database file.
 export const freezeBindings = {
+  [fundNavSnapshotId]: ['factors.fund_warehouse.nav_db'],
   'snapshot.etf_smartbeta.three_bucket_execution.current': ['factors.etf_smartbeta.broad', 'factors.etf_smartbeta.bench', 'factors.etf_smartbeta.panel', 'factors.etf_smartbeta.investable', 'factors.etf_smartbeta.basis', 'factors.etf_smartbeta.macro_pmi', 'factors.etf_smartbeta.macro_m2', 'factors.etf_smartbeta.macro_shibor'],
   'snapshot.etf_smartbeta.industry_execution.current': ['factors.etf_smartbeta.panel', 'factors.etf_smartbeta.bench', 'factors.etf_smartbeta.investable'],
   'snapshot.fund_warehouse.wide_today.current': ['factors.fund_warehouse.wide_today'],
@@ -16,8 +20,31 @@ export const freezeBindings = {
   'snapshot.etf_smartbeta.industry_panel.current': ['factors.etf_smartbeta.panel', 'factors.etf_smartbeta.bench'],
 };
 
-function contentId(baseSnapshotId, files) {
+function normalizedSelection(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join(',') !== 'benchmarkId,codes,sourceVersions'
+    || !Array.isArray(value.codes) || value.codes.length < 1 || value.codes.length > 10 || value.codes.some(code => !/^[0-9]{6}$/.test(code))
+    || value.codes.some(code => typeof code !== 'string') || new Set(value.codes).size !== value.codes.length
+    || typeof value.benchmarkId !== 'string' || !/^[A-Z][A-Z0-9_]{1,20}$/.test(value.benchmarkId) || !Array.isArray(value.sourceVersions)) throw fail('fund_snapshot_selection_required');
+  const codes = [...value.codes].sort();
+  const ids = ['universe_master', ...value.codes.map(code => 'nav.'+code), 'benchmark.'+value.benchmarkId];
+  if (value.sourceVersions.length !== ids.length || value.sourceVersions.some((row,i) => !row || row.sourceId !== ids[i]
+    || Object.keys(row).sort().join(',') !== 'bytes,sha256,sourceId' || !/^[a-f0-9]{64}$/.test(row.sha256) || !Number.isSafeInteger(row.bytes) || row.bytes < 0)) throw fail('fund_snapshot_selection_required');
+  const versions = new Map(value.sourceVersions.map(row => [row.sourceId, row]));
+  return { codes, benchmarkId: value.benchmarkId, sourceVersions: ['universe_master', ...codes.map(code => 'nav.'+code), 'benchmark.'+value.benchmarkId].map(id => {
+    const row = versions.get(id); return { sourceId: row.sourceId, sha256: row.sha256, bytes: row.bytes };
+  }) };
+}
+
+function normalizedCaptureSources(value) {
+  const names = ['__main__', 'fund_history_store'];
+  if (!Array.isArray(value) || value.length !== names.length || value.some((row, i) => !row || row.moduleName !== names[i]
+    || Object.keys(row).sort().join(',') !== 'moduleName,sha256' || typeof row.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(row.sha256))) throw fail('invalid_fund_snapshot_capture_sources');
+  return value.map(({ moduleName, sha256 }) => ({ moduleName, sha256 }));
+}
+
+function contentId(baseSnapshotId, files, selection, captureSources) {
   const identity = { baseSnapshotId, files: files.map(({ assetId, sha256, bytes }) => ({ assetId, sha256, bytes })).sort((a, b) => a.assetId.localeCompare(b.assetId)) };
+  if (baseSnapshotId === fundNavSnapshotId) { identity.selection = normalizedSelection(selection); identity.captureSources = normalizedCaptureSources(captureSources); }
   return `snapshot.frozen.${hash(JSON.stringify(identity))}`;
 }
 
@@ -48,7 +75,8 @@ export function createFrozenSnapshotStore({ root, candidates, assets }) {
         || item.files.length !== expected.length || new Set(item.files.map(file => file.assetId)).size !== expected.length
         || item.files.some(file => !expected.includes(file.assetId) || !/^[a-f0-9]{64}$/.test(file.sha256)
           || !Number.isSafeInteger(file.bytes) || file.bytes < 0 || file.fileName !== path.basename(byAsset.get(file.assetId)?.storageRef || ''))
-        || contentId(item.baseSnapshotId, item.files) !== id) throw fail('invalid_frozen_snapshot_manifest');
+        || (item.baseSnapshotId !== fundNavSnapshotId && item.selection !== undefined)
+        || contentId(item.baseSnapshotId, item.files, item.selection, item.captureSources) !== id) throw fail('invalid_frozen_snapshot_manifest');
       if (item.totalBytes !== item.files.reduce((sum, file) => sum + file.bytes, 0) || item.totalBytes > maxBytes) throw fail('invalid_frozen_snapshot_manifest');
       return item;
     } catch (error) {
@@ -88,10 +116,12 @@ export function createFrozenSnapshotStore({ root, candidates, assets }) {
     }
     return items;
   }
-  async function freeze(baseSnapshotId, title = '') {
+  async function freeze(baseSnapshotId, title = '', selection) {
     const binding = freezeBindings[baseSnapshotId];
     const candidate = byCandidate.get(baseSnapshotId);
     if (!binding || !candidate) throw fail('unsupported_snapshot_freeze');
+    if (baseSnapshotId === fundNavSnapshotId) normalizedSelection(selection);
+    else if (selection !== undefined) throw fail('unexpected_snapshot_selection');
     await mkdir(root, { recursive: true, mode: 0o700 });
     const rootInfo = await lstat(root);
     if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) throw fail('invalid_frozen_snapshot_directory');
@@ -100,9 +130,24 @@ export function createFrozenSnapshotStore({ root, candidates, assets }) {
     try {
       const originals = [];
       let totalBytes = 0;
+      let capturedSelection;
+      let captureSources;
       for (const assetId of binding) {
         const asset = byAsset.get(assetId);
         if (!asset) throw fail('snapshot_source_unavailable', 404);
+        if (baseSnapshotId === fundNavSnapshotId) {
+          const source = fileURLToPath(new URL('./fund_history_snapshot.py', import.meta.url));
+          const result = await executePinnedPython(source, [asset.storageRef, path.join(staging, path.basename(asset.storageRef)), JSON.stringify(selection)],
+            { modules: [{ name: 'fund_history_store', path: fileURLToPath(new URL('./fund_history_store.py', import.meta.url)) }], timeout: 60000, maxBuffer: 1024*1024 });
+          const captured = JSON.parse(result.stdout);
+          if (captured.error) throw fail(captured.error, /source_version_changed/.test(captured.error) ? 409 : 422);
+          capturedSelection = captured.selection; captureSources = result.sourceHashes;
+          const bytes = await readFile(path.join(staging, path.basename(asset.storageRef)));
+          if (bytes.length > maxBytes || bytes.length !== captured.bytes || hash(bytes) !== captured.sha256) throw fail('snapshot_freeze_size_limit');
+          totalBytes += bytes.length;
+          originals.push({ assetId, fileName: path.basename(asset.storageRef), sha256: captured.sha256, bytes: captured.bytes, sourceRef: asset.storageRef });
+          continue;
+        }
         let before;
         try { before = await regularFile(asset.storageRef); }
         catch (error) { if (error.code === 'ENOENT') throw fail('snapshot_source_unavailable', 404); throw error; }
@@ -117,15 +162,17 @@ export function createFrozenSnapshotStore({ root, candidates, assets }) {
       }
       // Recheck the entire bundle after copying, not only each file in isolation.
       for (const file of originals) {
+        if (baseSnapshotId === fundNavSnapshotId) continue;
         await regularFile(file.sourceRef);
         if (hash(await readFile(file.sourceRef)) !== file.sha256) throw fail('snapshot_source_changed_retry', 409);
       }
-      const snapshotId = contentId(baseSnapshotId, originals);
+      const snapshotId = contentId(baseSnapshotId, originals, capturedSelection, captureSources);
       const item = {
         schemaVersion: 1, module: 'factors', snapshotId, baseSnapshotId, title: title || `${candidate.title} / frozen`, createdAt: new Date().toISOString(),
         universe: candidate.universe, comparisonGroup: candidate.comparisonGroup, frequency: candidate.frequency,
         asOfDate: null, periodStart: null, periodEnd: null, files: originals, assetIds: binding,
         totalBytes, hashPolicy: 'full_content_sha256', freezePolicy: 'explicit_local_copy_no_fetch_no_update',
+        ...(capturedSelection ? { selection: capturedSelection, captureSources, capturePolicy: 'selected_full_history_sqlite_read_transaction' } : {}),
         limitations: [...candidate.limitations, 'freeze_time_is_not_data_as_of_date', 'local_copy_not_external_backup'],
       };
       await writeFile(path.join(staging, 'manifest.json'), JSON.stringify(item, null, 2) + '\n', { flag: 'wx', mode: 0o444 });

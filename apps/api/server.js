@@ -113,12 +113,12 @@ const fundNavEngine = { artifactCandidateId: 'artifact.factor.fund_nav_fixed_dca
   computePolicy: 'manual_basket_sqlite_adjusted_nav_no_latest_factor_selection', inputSnapshotIds: ['snapshot.fund_warehouse.nav_db.current'] };
 const fundNavSettings = { startDate: '2025-01-02', endDate: '2026-07-30', amount: 10000, frequency: 'monthly', calendarPolicy: 'common_observed_dates', maxGapDays: 14, benchmarkPolicy: 'same_flow_gross_index', shares: [], sourceVersions: [] };
 function fundNavRoot() { return factorDataAssets.find(item => item.assetId === 'factors.fund_warehouse.nav_db').storageRef; }
-async function fundNavPython(mode, payload) {
-  const result = await executePinnedPython(path.join(projectRoot, 'modules/factors/src/fund_nav_engine.py'), [fundNavRoot(), mode, JSON.stringify(payload)], {
+async function fundNavPython(mode, payload, input = { storageRef: fundNavRoot(), expectedSha256: null }) {
+  const result = await executePinnedPython(path.join(projectRoot, 'modules/factors/src/fund_nav_engine.py'), [input.storageRef, mode, JSON.stringify(payload), input.expectedSha256 || ''], {
     timeout: 60000, maxBuffer: 12 * 1024 * 1024, modules: ['dca_engine', 'fund_history_store'].map(name => ({ name, path: path.join(projectRoot, `modules/factors/src/${name}.py`) })),
   });
   const run = JSON.parse(result.stdout);
-  if (run.error) throw Object.assign(new Error(run.error), { status: /source_version_changed|source_changed_retry/.test(run.error) ? 409 : 422 });
+  if (run.error) throw Object.assign(new Error(run.error), { status: /source_version_changed|source_changed_retry|frozen_snapshot_integrity_failed/.test(run.error) ? 409 : 422 });
   return { run, sourceHashes: result.sourceHashes };
 }
 const seedSkills = [
@@ -175,7 +175,7 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.1', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.2', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -224,8 +224,10 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
     if (['/api/modules/factors/v1/fund-nav/catalog', '/api/modules/factors/v1/fund-nav/profile'].includes(url.pathname)) {
       try {
         const catalog = url.pathname.endsWith('/catalog');
-        const { run } = await fundNavPython(catalog ? 'catalog' : 'profile', catalog ? { query: url.searchParams.get('q') || '' } : { codes: (url.searchParams.get('codes') || '').split(','), benchmarkId: url.searchParams.get('benchmarkId') });
-        return json(200, run);
+        const snapshotId = url.searchParams.get('snapshotId') || fundNavEngine.inputSnapshotIds[0];
+        const input = await factorInput(snapshotId, 'factors.fund_warehouse.nav_db', fundNavEngine.inputSnapshotIds[0], snapshotStore);
+        const { run } = await fundNavPython(catalog ? 'catalog' : 'profile', catalog ? { query: url.searchParams.get('q') || '' } : { codes: (url.searchParams.get('codes') || '').split(','), benchmarkId: url.searchParams.get('benchmarkId') }, input);
+        return json(200, { ...run, snapshotId, frozenSnapshot: input.snapshot });
       } catch (error) { return json(error.status || 500, { error: error.status ? error.message : 'fund_history_query_failed' }); }
     }
     if (url.pathname === '/api/modules/factors/v1/data-quality') return factorDataQuality(json);
@@ -487,13 +489,13 @@ async function factorFrozenSnapshots(url, { method, body, json, snapshotStore })
       if (method === 'GET' || method === 'HEAD') {
         const items = await snapshotStore.list();
         return json(200, { module: 'factors', mode: 'local_frozen_snapshot_manifests', items, count: items.length,
-          freezeOptions: factorSnapshotCandidates.filter(item => Object.hasOwn(freezeBindings, item.snapshotId)).map(item => ({ baseSnapshotId: item.snapshotId, title: item.title, assetIds: freezeBindings[item.snapshotId] })),
+          freezeOptions: factorSnapshotCandidates.filter(item => Object.hasOwn(freezeBindings, item.snapshotId)).map(item => ({ baseSnapshotId: item.snapshotId, title: item.title, assetIds: freezeBindings[item.snapshotId], selectionRequired: item.snapshotId === fundNavEngine.inputSnapshotIds[0] })),
           note: '列表仅读取清单；内容校验由用户手动触发或在执行前进行。冻结时间不是数据截止日期。' });
       }
       const parsed = parseJsonBody(body);
       if (parsed.error) return json(400, parsed);
-      if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value) || Object.keys(parsed.value).some(key => !['baseSnapshotId', 'title'].includes(key))) return json(422, { error: 'invalid_snapshot_freeze_fields' });
-      const result = await snapshotStore.freeze(clean(parsed.value.baseSnapshotId), clean(parsed.value.title));
+      if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value) || Object.keys(parsed.value).some(key => !['baseSnapshotId', 'title', 'selection'].includes(key))) return json(422, { error: 'invalid_snapshot_freeze_fields' });
+      const result = await snapshotStore.freeze(clean(parsed.value.baseSnapshotId), clean(parsed.value.title), parsed.value.selection);
       return json(201, { module: 'factors', ...result });
     }
     const parts = url.pathname.slice(base.length + 1).split('/');
@@ -510,7 +512,9 @@ async function factorInput(snapshotId, assetId, baseSnapshotId, snapshotStore) {
   const resolved = await snapshotStore.resolve(snapshotId, assetId);
   if (resolved.item.baseSnapshotId !== baseSnapshotId) throw Object.assign(new Error('snapshot_comparison_group_mismatch'), { status: 422 });
   return { storageRef: resolved.storageRef, expectedSha256: resolved.file.sha256,
-    snapshot: { snapshotId, baseSnapshotId, createdAt: resolved.item.createdAt, hashPolicy: resolved.item.hashPolicy, verification: 'sha256_verified', files: resolved.item.files.map(({ assetId, sha256, bytes }) => ({ assetId, sha256, bytes })) } };
+    snapshot: { snapshotId, baseSnapshotId, createdAt: resolved.item.createdAt, hashPolicy: resolved.item.hashPolicy, verification: 'sha256_verified',
+      ...(resolved.item.selection ? { selection: resolved.item.selection, captureSources: resolved.item.captureSources } : {}),
+      files: resolved.item.files.map(({ assetId, sha256, bytes }) => ({ assetId, sha256, bytes })) } };
 }
 
 async function listFactorSnapshotRecords() {
@@ -1849,8 +1853,8 @@ async function factorBacktestEngine(json) {
         supportedSnapshotIds: customExpressionEngine.inputSnapshotIds, calculations: ['explicit_field_bindings', 'safe_ast_dependency_order', 'backward_full_windows', 'complete_case_zscore', 'immutable_revision_sha', 'prior_signal_monthly_topn'],
         blockers: ['fund_historical_factor_selection', 'point_in_time_disclosures', 'full_attribution'] },
       { engineId: 'engine.factor.fund_nav_fixed_dca_v1', title: fundNavEngine.title, status: 'active_for_manual_daily_same_adjustment_baskets',
-        supportedSnapshotIds: fundNavEngine.inputSnapshotIds, calculations: ['sqlite_selected_import_sha_read_transaction', 'adjustment_frequency_checks', 'common_observed_calendar', 'fixed_weight_new_contributions', 'dated_twr_xirr'],
-        blockers: ['historical_point_in_time_factor_selection', 'dynamic_frozen_nav_bundle', 'actual_settlement_and_redemption_rules'] },
+        supportedSnapshotIds: [...fundNavEngine.inputSnapshotIds, 'matching_frozen_selected_nav_bundle'], calculations: ['sqlite_selected_import_sha_read_transaction', 'selected_immutable_snapshot_verified_bytes', 'adjustment_frequency_checks', 'common_observed_calendar', 'fixed_weight_new_contributions', 'dated_twr_xirr'],
+        blockers: ['historical_point_in_time_factor_selection', 'actual_settlement_and_redemption_rules'] },
       {
         engineId: 'engine.factor.three_bucket_monthly_v1', title: threeBucketEngine.title,
         status: 'active_for_explicit_eight_file_three_bucket_configs',
@@ -2073,7 +2077,7 @@ async function writeFactorResultArtifacts(data) {
 async function buildLocalFactorResultArtifact({ request, config, existing, snapshotStore }) {
   const artifactId = makeResultArtifactId(request.requestId, existing);
   if (config.strategyTemplateId === 'strategy.custom_industry_expression') return buildIndustryResultArtifact({ request, config, artifactId, snapshotStore, custom:true });
-  if (config.strategyTemplateId === 'strategy.fund_nav_fixed_dca') return buildFundNavResultArtifact({ request, config, artifactId });
+  if (config.strategyTemplateId === 'strategy.fund_nav_fixed_dca') return buildFundNavResultArtifact({ request, config, artifactId, snapshotStore });
   if (config.strategyTemplateId === 'strategy.legacy_three_bucket_monthly') return buildThreeBucketResultArtifact({ request, config, artifactId, snapshotStore });
   if (config.strategyTemplateId === 'strategy.industry_parquet_monthly_topn') return buildIndustryResultArtifact({ request, config, artifactId, snapshotStore });
   if (config.strategyTemplateId === 'strategy.fund_cross_section_screen') return buildFundScreenResultArtifact({ request, config, artifactId, snapshotStore });
@@ -2086,9 +2090,10 @@ async function buildLocalFactorResultArtifact({ request, config, existing, snaps
   throw Object.assign(new Error('unsupported_factor_execution_config'), { status: 422 });
 }
 
-async function buildFundNavResultArtifact({ request, config, artifactId }) {
+async function buildFundNavResultArtifact({ request, config, artifactId, snapshotStore }) {
   if (request.artifactCandidateId !== fundNavEngine.artifactCandidateId) throw Object.assign(new Error('unsupported_fund_nav_engine_candidate'), { status: 422 });
-  const { run, sourceHashes } = await fundNavPython('execute', config);
+  const input = await factorInput(config.snapshotId, 'factors.fund_warehouse.nav_db', fundNavEngine.inputSnapshotIds[0], snapshotStore);
+  const { run, sourceHashes } = await fundNavPython('execute', config, input);
   const series = Object.fromEntries(['accountValue', 'benchmarkValue', 'unitNav', 'benchmarkNav', 'contributed'].map(key => [key, sampleSeries(run.rows.map(row => row.date), run.rows.map(row => row[key]), 180)]));
   return {
     artifactId, module: 'factors', experimentId: config.configId, requestId: request.requestId, title: request.title || `${config.title} 净值回测`,
@@ -2096,13 +2101,14 @@ async function buildFundNavResultArtifact({ request, config, artifactId }) {
     storageRef: `var/factors/result-artifacts.json#${artifactId}`, executionMode: 'native_workbench_fund_nav_fixed_dca_v1', computePolicy: fundNavEngine.computePolicy,
     configSnapshot: { ...resultConfigSnapshot(config), configRevision: config.revision }, period: run.period, metrics: run.metrics, series, accountLedger: run.rows, cashFlows: run.cashFlows, pendingContributions: run.pendingContributions,
     fundNavProfile: run.profile, holdings: [], sensitivity: [], attribution: run.attribution, warnings: run.warnings,
-    dataScope: { snapshotId: config.snapshotId, sourceVersions: run.profile.sourceVersions, calculationSources: sourceHashes, calendarAudit: run.calendarAudit, allocationWeights: run.allocationWeights,
+    dataScope: { snapshotId: config.snapshotId, frozenSnapshot: input.snapshot, sourceVersions: run.profile.sourceVersions, calculationSources: sourceHashes, calendarAudit: run.calendarAudit, allocationWeights: run.allocationWeights,
       calculationLogic: ['仅从新工作台SQLite读取选定份额的adj_nav及导入SHA，读事务保证源一致；CSV更新须显式重新导入。日频与复权方式同组，不用最新宽表做历史择优或最新持仓反推复合基准。',
         '基准显式单指数，全收益或价格口径保存。执行日历为所有份额与基准实际日期交集，不填充；计划投入在计划日之后首个共同数据日执行。超出共同覆盖或超过配置日期缺口上限拒绝。',
         '新投入按固定比例，净买入预算=金额×权重/(1+申购费+滑点)。持仓不卖出或再平衡；复权净值模拟份额不等于实际申购确认份额。',
         '基金净值已体现日常管理等费用，不再扣年费。基准接受同现金流毛指数，不扣模拟申购费；TWR排除外部投入，XIRR使用实际日期。',
         '波动年化系数=(共同观测数-1)/实际区间年数，不固定为252或244；Sharpe无风险利率为0。'],
-      limitation: '手动选取存续基金有幸存者偏差；旧自复权与hfq口径保留，未重新核验每次分红拆分。共同日历可能排除部分净值日期。没有实际申赎/确认滞后、历史因子轮动、动态冻结副本、赎回规则或完整归因。' },
+      temporalEligibility: { status: 'not_point_in_time_verified', historicalFactorSelectionAllowed: false, reason: '手动固定篮子；日期是净值观测日，不是净值/持仓/名录披露可得时间。冻结只保证输入可复现，不消除幸存者偏差或证明无超前数据。' },
+      limitation: '手动选取存续基金有幸存者偏差；旧自复权与hfq口径保留，未重新核验每次分红拆分。共同日历可能排除部分净值日期。没有实际申赎/确认滞后、历史因子轮动、赎回规则或完整归因。冻结选定源不等于PIT数据。' },
   };
 }
 

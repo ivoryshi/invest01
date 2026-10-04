@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { industrySaveMethod } from '../apps/web/industry-state.js';
-import { isCurrentFundEdit } from '../apps/web/fund-screen-state.js';
+import { isCurrentFundEdit, refreshSnapshotChoices } from '../apps/web/fund-screen-state.js';
 
 class Node {
   constructor(tag) { this.tag = tag; this.children = []; this.listeners = {}; this._value = ''; this.attrs = {}; }
@@ -22,37 +22,71 @@ const descendants = n => [n, ...n.children.flatMap(descendants)];
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
 const source = await readFile(new URL('../apps/web/app.js', import.meta.url), 'utf8');
 const panelSource = source.slice(source.indexOf('async function fundNavConfigPanel('), source.indexOf('async function strategyConfigWorkbenchPanel('));
+const pickerSource = source.slice(source.indexOf('async function populateSnapshotSelect('), source.indexOf('async function frozenSnapshotPanel('));
+const currentId = 'snapshot.fund_warehouse.nav_db.current', frozenId = `snapshot.frozen.${'a'.repeat(64)}`;
 const api = await readFile(new URL('../apps/api/server.js', import.meta.url), 'utf8');
 const defaults = vm.runInNewContext(`${api.slice(api.indexOf('const fundNavSettings = '), api.indexOf('function fundNavRoot('))}; fundNavSettings`);
 
-async function fixture() {
+async function fixture({ unavailableCurrent = false, savedSnapshot = currentId } = {}) {
   const binding = [{ sourceId: 'nav.000001', sha256: 'abc', bytes: 4 }];
-  const template = { title: 'fund', strategyTemplateId: 'strategy.fund_nav_fixed_dca', benchmarkId: 'CSI300', strategySettings: defaults, costModel: 'subscription=0;slippage=0' };
-  const configs = { templates: [template], items: ['a', 'b'].map(x => ({ ...template, configId: `config.${x}`, revision: 1, strategySettings: { ...defaults, shares: [{ shareCode: '000001', weight: 1 }], sourceVersions: binding } })) };
+  const template = { title: 'fund', snapshotId: currentId, strategyTemplateId: 'strategy.fund_nav_fixed_dca', benchmarkId: 'CSI300', strategySettings: defaults, costModel: 'subscription=0;slippage=0' };
+  const configs = { templates: [template], items: ['a', 'b'].map(x => ({ ...template, snapshotId: savedSnapshot, configId: `config.${x}`, revision: 1, strategySettings: { ...defaults, shares: [{ shareCode: '000001', weight: 1 }], sourceVersions: binding } })) };
   const profile = { sourceVersions: binding, commonStartDate: '2025-06-17', commonEndDate: '2026-07-31', commonObservations: 266,
     adjustmentMethod: 'self_calc', benchmark: { id: 'CSI300', kind: 'total' }, funds: [] };
-  let delayedRead = null, delayedProfile = null, delayedWrite = null; const writes = [], gets = [];
+  let delayedRead = null, delayedProfile = null, delayedWrite = null, delayedFreeze = null; const writes = [], gets = [], captures = [];
   const element = (tag, text) => { const n = new Node(tag); n.textContent = text; return n; };
   const option = (value, text) => { const n = element('option', text); n.value = value; return n; };
-  const context = vm.createContext({ document: { createElement: tag => new Node(tag) }, element, option, industrySaveMethod, isCurrentFundEdit, URLSearchParams,
-    editFundNavConfig: null, refreshFactorExecution: async () => {}, resultDiagnosticTable: () => new Node('table'),
+  const context = vm.createContext({ document: { createElement: tag => new Node(tag) }, element, option, industrySaveMethod, isCurrentFundEdit, refreshSnapshotChoices, URLSearchParams, encodeURIComponent,
+    editFundNavConfig: null, refreshFundNavSnapshotChoices: null, refreshFrozenSnapshotList: null, refreshFactorExecution: async () => {}, resultDiagnosticTable: () => new Node('table'),
     fetch: async (url, init) => {
+      if (url.endsWith('/snapshots/frozen')) {
+        if (init) { captures.push(JSON.parse(init.body)); if (delayedFreeze) { const pending = delayedFreeze; delayedFreeze = null; await pending.promise; } return { ok: true, json: async () => ({ snapshotId: frozenId }) }; }
+        return { ok: true, json: async () => ({ items: [{ status: 'frozen', baseSnapshotId: currentId, snapshotId: frozenId, createdAt: '2026-10-04T00:00:00Z' }] }) };
+      }
       if (init) { const body = JSON.parse(init.body); writes.push({ url, method: init.method, body }); if (delayedWrite) { const pending = delayedWrite; delayedWrite = null; await pending.promise; } return { ok: true, json: async () => ({ item: { configId: body.configId, revision: 2 } }) }; }
       gets.push(url);
-      if (url.includes('/catalog')) return { ok: true, json: async () => ({ defaults, benchmarks: ['CSI300','CSI500'], items: [], hasMore: false }) };
+      if (url.includes('/catalog')) return { ok: !(unavailableCurrent && !url.includes('snapshot.frozen.')), json: async () => ({ defaults, benchmarks: ['CSI300','CSI500'], items: [], hasMore: false }) };
       if (url.includes('/profile')) { if (delayedProfile) { const pending = delayedProfile; delayedProfile = null; await pending.promise; } return { ok: true, json: async () => profile }; }
       if (delayedRead) { const pending = delayedRead; delayedRead = null; await pending.promise; }
       return { ok: true, json: async () => configs };
     },
   });
-  vm.runInContext(`${panelSource}; globalThis.createPanel = fundNavConfigPanel`, context);
+  vm.runInContext(`${pickerSource}; ${panelSource}; globalThis.createPanel = fundNavConfigPanel`, context);
   const panel = await context.createPanel(), nodes = descendants(panel), form = nodes.find(n => n.tag === 'form');
   const fields = Object.fromEntries(nodes.filter(n => n.name).map(n => [n.name,n]));
   const button = text => nodes.find(n => n.tag === 'button' && n.textContent === text);
   const manual = nodes.find(n => n.attrs['aria-label'] === '手动基金份额代码');
-  return { context, form, fields, nodes, writes, gets, manual, binding, submit: button('保存基金历史配置'), read: button('读取数据库净值与基准'), fresh: button('新建配置'), add: button('加入篮子'),
-    delayRead() { delayedRead = deferred(); return delayedRead; }, delayProfile() { delayedProfile = deferred(); return delayedProfile; }, delayWrite() { delayedWrite = deferred(); return delayedWrite; } };
+  return { context, form, fields, nodes, writes, gets, captures, manual, binding, submit: button('保存基金历史配置'), freeze: button('冻结已绑定基金数据'), read: button('读取数据库净值与基准'), fresh: button('新建配置'), add: button('加入篮子'),
+    delayRead() { delayedRead = deferred(); return delayedRead; }, delayProfile() { delayedProfile = deferred(); return delayedProfile; }, delayWrite() { delayedWrite = deferred(); return delayedWrite; }, delayFreeze() { delayedFreeze = deferred(); return delayedFreeze; } };
 }
+
+test('fund freeze binds selected data to explicit save without automatically executing', async () => {
+  const f = await fixture(); assert.equal(f.freeze.disabled, true);
+  f.manual.value = '000001'; await f.add.click(); await f.read.click(); await f.freeze.click();
+  assert.equal(f.captures[0].baseSnapshotId, currentId);
+  assert.deepEqual(f.captures[0].selection, { codes: ['000001'], benchmarkId: 'CSI300', sourceVersions: f.binding });
+  assert.equal(f.writes.length, 0); assert.equal(f.fields.snapshotId.value, frozenId); assert.equal(f.freeze.disabled, true);
+  await f.form.fire('submit'); assert.equal(f.writes[0].body.snapshotId, frozenId);
+});
+test('fresh during freeze cannot bind old capture to new experiment', async () => {
+  const f = await fixture(); f.manual.value = '000001'; await f.add.click(); await f.read.click();
+  const delayed = f.delayFreeze(), freezing = f.freeze.click();
+  assert.equal(f.submit.disabled, true); await f.fresh.click(); delayed.resolve(); await freezing;
+  assert.equal(f.fields.snapshotId.value, currentId); assert.equal(f.submit.disabled, true); assert.equal(f.writes.length, 0);
+});
+test('snapshot change rejects late profile binding and saved frozen configuration preserves exact ID', async () => {
+  const f = await fixture({ savedSnapshot: frozenId }); await f.context.editFundNavConfig({ configId: 'config.a' });
+  assert.equal(f.fields.snapshotId.value, frozenId); await f.read.click();
+  assert.ok(f.gets.some(url => url.includes('/profile?') && url.includes(frozenId)));
+  await f.form.fire('submit'); assert.equal(f.writes[0].body.snapshotId, frozenId);
+  const delayed = f.delayProfile(), reading = f.read.click();
+  f.fields.snapshotId.value = currentId; await f.fields.snapshotId.fire('change'); delayed.resolve(); await reading;
+  assert.equal(f.submit.disabled, true); await f.form.fire('submit'); assert.equal(f.writes.length, 1);
+});
+test('unavailable live database does not prevent explicit frozen replay form', async () => {
+  const f = await fixture({ unavailableCurrent: true }); assert.ok(f.form); assert.equal(f.fields.snapshotId.value, frozenId);
+  assert.ok(f.gets.some(url => url.includes('/catalog?snapshotId=') && url.includes(frozenId)));
+});
 
 test('new fund form cannot save without DB source binding, profile enables POST', async () => {
   const f = await fixture(); assert.equal(f.fields.savedConfig.required, false); assert.equal(f.submit.disabled, true);

@@ -23,8 +23,8 @@
 | /run-requests/{requestId}/execute | POST | 同配置revision实际执行 |
 | /result-artifacts、/result-artifacts/{artifactId} | GET | 新结果列表/详情与复核清单 |
 | /fund-screen/options、/fund-screen/profile | GET | 宽表同口径组、字段和源版本 |
-| /fund-nav/catalog?q= | GET | SQLite份额名录搜索 |
-| /fund-nav/profile?codes=000001,000002&benchmarkId=CSI300 | GET | 选定净值/基准覆盖和源SHA |
+| /fund-nav/catalog?q= | GET | SQLite份额名录搜索；可选snapshotId指定冻结版本 |
+| /fund-nav/profile?codes=000001,000002&benchmarkId=CSI300 | GET | 选定净值/基准覆盖和源SHA；可选snapshotId指定冻结版本 |
 | /data-layer、/data-layer/schema、/data-quality | GET | 数据登记/字段/质量说明 |
 | /data-layer/preview | GET | 有界样本，非全表质量结论 |
 | /snapshots/frozen | GET、POST | 冻结列表/捕获支持的baseSnapshotId |
@@ -43,6 +43,10 @@
 配置包括configId、title、strategyTemplateId、snapshotId、universe、factorFamilyIds、factorWeights、benchmarkId、portfolioRule、rebalanceCalendar、costModel、constraints、comparisonLimits、strategySettings/transactionSettings。应从当前templates或原生表单获取完整字段，不拼凑只含ID的请求。某些通用草案可保存但不能执行，执行阶段严格拒绝不支持规则。
 
 自建factorProgram必须引用已注册或已保存历史revision和executionSha256；不是客户端任意填入的“证明”。修改定义不改变配置中的公式副本。基金篮子需先profile读取sourceVersions；筛选也需读取源SHA与严格comparisonGroup。
+
+基金冻结POST /snapshots/frozen正文为baseSnapshotId="snapshot.fund_warehouse.nav_db.current"、可选title、必填selection。selection精确包含codes数组、benchmarkId、profile返回的sourceVersions，凭证按universe_master、请求codes顺序、benchmark顺序原样传入。不得填客户端自造SHA。返回snapshotId后显式写入配置再保存，不自动保存或执行。GET返回freezeOptions.selectionRequired=true；通用文件冻结表单不代替基金选定源绑定。冻结profile/execute要求同一篮子与基准（篮子顺序可不同），变化需另建快照。
+
+基金profile/结果含temporalEligibility的not_point_in_time_verified和禁止历史因子选基标记。冻结是完整性/复现保障，不是历史可得性证明，Agent不得以清单createdAt替代数据披露日。详细协议见[数据时点](FACTOR-DATA.md)中的“数据时点与比较”。
 
 ## 最小执行交接
 

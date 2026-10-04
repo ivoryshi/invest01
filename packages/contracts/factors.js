@@ -268,8 +268,8 @@ export const factorSnapshotCandidates = [
     title: '手动基金篮子历史净值（数据库导入版本绑定）', asOfDate: null, universe: 'manual_fund_share_basket',
     frequency: 'daily_observed_nav', periodStart: null, periodEnd: null, sourceIds: [], hash: 'selected_import_source_sha_on_profile', createdAt: null,
     comparisonGroup: 'manual_fund_nav_cashflow_backtest', assetIds: ['factors.fund_warehouse.nav_db'],
-    limitations: ['manual_selection_survivorship', 'no_historical_factor_rotation', 'no_dynamic_frozen_bundle', 'adjusted_nav_not_actual_trade_settlement'],
-    notes: '执行在数据库读事务中绑定选定份额、单指数与名录的导入SHA，重新导入变化后要求重读保存；不是不可变历史冻结副本。',
+    limitations: ['manual_selection_survivorship', 'no_historical_factor_rotation', 'adjusted_nav_not_actual_trade_settlement'],
+    notes: '当前库读事务绑定导入SHA，变化后要求重读；可显式冻结选定份额/单基准及名录记录，冻结字节另有SHA，不复制整库。',
   },
   {
     snapshotId: 'snapshot.etf_smartbeta.three_bucket_execution.current', datasetId: 'factors.etf_smartbeta.broad',

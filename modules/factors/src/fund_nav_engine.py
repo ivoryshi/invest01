@@ -4,6 +4,7 @@ import json
 import math
 import re
 import sys
+import sqlite3
 
 import numpy as np
 import pandas as pd
@@ -44,11 +45,11 @@ def one_value(frame, field, allowed):
     return frame[field].iloc[0]
 
 
-def load(database, codes, benchmark):
+def load(database, codes, benchmark, expected_sha256=None):
     codes_checked(codes)
     if benchmark not in BENCHMARKS:
         raise ValueError('unsupported_fund_nav_benchmark')
-    db = store.open_reader(database)
+    db = store.open_reader(database, expected_sha256)
     try:
         return load_transaction(db, codes, benchmark)
     finally:
@@ -56,6 +57,11 @@ def load(database, codes, benchmark):
 
 
 def load_transaction(db, codes, benchmark):
+    captured = db.execute("SELECT value FROM store_meta WHERE key='snapshot_selection'").fetchone()
+    if captured:
+        selection = json.loads(captured[0])
+        if sorted(codes) != selection['codes'] or benchmark != selection['benchmarkId']:
+            raise ValueError('fund_snapshot_selection_mismatch')
     versions = []
     versions.append(store.version(store.source(db, 'universe_master')))
     series, funds, methods = {}, [], []
@@ -93,17 +99,19 @@ def load_transaction(db, codes, benchmark):
     if len(aligned) < 2:
         raise ValueError('fund_nav_no_common_history')
     return aligned, {'version': VERSION, 'storage': 'workbench_sqlite', 'schemaVersion': store.SCHEMA_VERSION, 'funds': funds, 'benchmark': {'id': benchmark, 'kind': kind, 'sourceCode': source_code, 'startDate': series['benchmark'].index[0].date().isoformat(), 'endDate': series['benchmark'].index[-1].date().isoformat()},
-        'commonStartDate': aligned.index[0].date().isoformat(), 'commonEndDate': aligned.index[-1].date().isoformat(), 'commonObservations': len(aligned), 'sourceVersions': versions, 'adjustmentMethod': methods[0]}, series
+        'commonStartDate': aligned.index[0].date().isoformat(), 'commonEndDate': aligned.index[-1].date().isoformat(), 'commonObservations': len(aligned), 'sourceVersions': versions, 'adjustmentMethod': methods[0],
+        'temporalEligibility': {'status': 'not_point_in_time_verified', 'observationDateField': 'date', 'availableAtField': None,
+            'historicalFactorSelectionAllowed': False, 'reason': 'observation_date_and_freeze_time_are_not_historical_information_availability'}}, series
 
 
-def profile(database, codes, benchmark):
-    return load(database, codes, benchmark)[1]
+def profile(database, codes, benchmark, expected_sha256=None):
+    return load(database, codes, benchmark, expected_sha256)[1]
 
 
-def catalog(database, query):
+def catalog(database, query, expected_sha256=None):
     if not isinstance(query, str) or len(query) > 128:
         raise ValueError('invalid_fund_nav_catalog_query')
-    db = store.open_reader(database)
+    db = store.open_reader(database, expected_sha256)
     try:
         matched = db.execute("SELECT code,name,EXISTS(SELECT 1 FROM sources WHERE source_id='nav.'||shares.code) AS available FROM shares WHERE instr(code,?)>0 OR instr(name,?)>0 ORDER BY code LIMIT 51", (query, query)).fetchall() if query else []
         items = [{'shareCode': row['code'], 'shareName': row['name'], 'historyAvailable': bool(row['available'])} for row in matched[:50]]
@@ -115,7 +123,8 @@ def catalog(database, query):
 
 
 def validate(config):
-    if config.get('strategyTemplateId') != 'strategy.fund_nav_fixed_dca' or config.get('universe') != 'manual_fund_share_basket' or config.get('snapshotId') != 'snapshot.fund_warehouse.nav_db.current':
+    if (config.get('strategyTemplateId') != 'strategy.fund_nav_fixed_dca' or config.get('universe') != 'manual_fund_share_basket' or
+            not (config.get('snapshotId') == 'snapshot.fund_warehouse.nav_db.current' or re.fullmatch(r'snapshot\.frozen\.[a-f0-9]{64}', config.get('snapshotId', '')))):
         raise ValueError('unsupported_fund_nav_strategy_or_snapshot')
     if config.get('factorFamilyIds') or config.get('factorWeights') or config.get('transactionSettings') or config.get('portfolioRule') != 'fixed_contribution_hold_adjusted_nav':
         raise ValueError('fund_nav_historical_factor_selection_not_supported')
@@ -221,14 +230,16 @@ def run(aligned, metadata, originals, config):
         'totalContributed': contributed, 'totalCost': costs, 'contributionCount': sum(len(x) for x in inflows.values()), 'observations': len(rows), 'pendingContributionCount': len(pending)},
         'rows': rows, 'cashFlows': flows, 'pendingContributions': pending, 'period': [rows[0]['date'], rows[-1]['date']], 'profile': metadata, 'attribution': cashflow_attribution(rows), 'allocationWeights': weights,
         'calendarAudit': {'policy': s['calendarPolicy'], 'maxObservedGapDays': max_gap, 'leadingGapDays': leading_gap, 'trailingGapDays': trailing_gap, 'requestedPeriod': [s['startDate'], s['endDate']], 'observationsPerYear': annualization, 'sourceDateCounts': {key: int(len(value.loc[start:end])) for key, value in originals.items()}, 'commonDateCount': len(data)},
-        'warnings': ['manual_selected_survivorship_not_historical_factor_rotation', 'fund_nav_embeds_running_fees_no_extra_management_fee', 'adjusted_nav_units_not_actual_trade_settlement', 'net_strategy_vs_gross_benchmark', 'alpha_attribution_not_computed'] + (['price_benchmark_not_total_return'] if metadata['benchmark']['kind'] == '价格' else []) + (['exchange_hfq_price_proxy_not_offexchange_nav'] if metadata['adjustmentMethod'] == 'hfq' else [])}
+        'warnings': ['manual_selected_survivorship_not_historical_factor_rotation', 'not_point_in_time_verified', 'fund_nav_embeds_running_fees_no_extra_management_fee', 'adjusted_nav_units_not_actual_trade_settlement', 'net_strategy_vs_gross_benchmark', 'alpha_attribution_not_computed'] + (['price_benchmark_not_total_return'] if metadata['benchmark']['kind'] == '价格' else []) + (['exchange_hfq_price_proxy_not_offexchange_nav'] if metadata['adjustmentMethod'] == 'hfq' else [])}
 
 
-def execute(database, config):
+def execute(database, config, expected_sha256=None):
     validate(config)
+    if config['snapshotId'].startswith('snapshot.frozen.') and expected_sha256 is None:
+        raise ValueError('fund_snapshot_verified_content_required')
     codes = [row['shareCode'] for row in config['strategySettings']['shares']]
     # One read transaction pins all selected sources even while offline imports commit.
-    db = store.open_reader(database)
+    db = store.open_reader(database, expected_sha256)
     try:
         aligned, metadata, originals = load_transaction(db, codes, config['benchmarkId'])
         return run(aligned, metadata, originals, config)
@@ -240,7 +251,8 @@ if __name__ == '__main__':
     try:
         database, mode, payload = sys.argv[1:4]
         payload = json.loads(payload)
-        result = profile(database, payload['codes'], payload['benchmarkId']) if mode == 'profile' else catalog(database, payload.get('query', '')) if mode == 'catalog' else execute(database, payload) if mode == 'execute' else {'error': 'unsupported_fund_nav_mode'}
-    except (ValueError, KeyError, TypeError, OSError, OverflowError) as error:
+        expected = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] else None
+        result = profile(database, payload['codes'], payload['benchmarkId'], expected) if mode == 'profile' else catalog(database, payload.get('query', ''), expected) if mode == 'catalog' else execute(database, payload, expected) if mode == 'execute' else {'error': 'unsupported_fund_nav_mode'}
+    except (ValueError, KeyError, TypeError, OSError, OverflowError, sqlite3.Error) as error:
         result = {'error': str(error)}
     print(json.dumps(result, ensure_ascii=False, allow_nan=False))

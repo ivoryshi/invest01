@@ -1,6 +1,6 @@
 # 因子数据准备与维护
 
-本页说明v0.5.1的数据边界。回测只使用已有授权数据，不隐式抓取。原始项目和旧fof.db只读。数据库、CSV/Parquet、冻结、备份和历史副本不上传Git，也不通过任意静态路径公开。
+本页说明v0.5.2的数据边界。回测只使用已有授权数据，不隐式抓取。原始项目和旧fof.db只读。数据库、CSV/Parquet、冻结、备份和历史副本不上传Git，也不通过任意静态路径公开。
 
 ## 数据位置
 
@@ -93,7 +93,15 @@ npm run backup:fund-history -- restore /absolute/path/to/backups/backupId --outp
 
 ## 实验冻结与旧档案
 
-冻结API适用于已支持的基金截面/宽基/三文件行业/八文件三档包，保存输入字节与身份。缺失或损坏返回错误，不回退current。基金SQLite的整库备份不是已绑定的动态实验冻结版本；selected源的冻结执行仍待接。
+冻结API适用于已支持的基金截面/宽基/三文件行业/八文件三档包，以及基金SQLite选定源。缺失或损坏返回错误，不回退current。整库备份不能代替选定实验snapshot。
+
+基金历史配置：先选择1至10个份额和一个基准，读取profile绑定sourceVersions，然后“冻结已绑定基金数据”，显式保存配置、创建请求并执行。数据版本下拉可选择现存冻结版本，打开旧配置保留原ID；若当前库不可用且有合法冻结清单，表单允许从冻结版本读取。列表只查清单，profile和执行会实际校验内容。
+
+捕获从一个SQLite读事务复制选定份额的完整历史、对应名录、一个基准和原导入凭证到独立schema=1数据库。不复制全库或import_runs/import_errors，不因不变源重读而产生新版本。单包最多64MiB，超限或凭证变化拒绝并清理临时副本；不触发抓取。基金codes顺序规范化，篮子/基准不符拒绝profile和执行，不能将同snapshot改成另一个篮子。
+
+snapshot.frozen身份绑定选定codes/benchmarkId/sourceVersions、实际SQLite字节SHA/大小及捕获程序/依赖SHA。sourceVersions是原CSV导入凭证，不是整个冻结SQLite的SHA；结果同时保存两者及实际执行源码指纹。捕获程序指纹变化可产生新身份，即使数据逻辑相同。名录原凭证属于全名录，但冻结只含选定行，统计单独注明不等于全库来源数。
+
+运行先校验清单与文件，再对真正读取的同一字节重新校验SHA并反序列化到只读内存SQLite，避免校验后文件路径被替换。活动库之后更新、移动或删除不影响冻结复算。只复现数据输入；没有自动保留/执行旧解释器或环境，跨源码/依赖版本的数值复现仍需核对结果中的版本。SHA不是签名，也不证明供应商数据真实或历史可得。
 
 ```sh
 npm run archive:factor-legacy
@@ -105,3 +113,17 @@ npm run archive:factor-legacy -- --verify
 ## 数据时点与比较
 
 基金净值最晚2026-09-30、基准最晚2026-07-31为上批本机验收记录，不保证新机器/后来导入仍相同；以当前profile为准。共同覆盖不足拒绝，不补价。最新wide_today不能用于历史择优；历史横截面、财务披露可见日和宏观修订史仍缺。不同snapshot/成本/基准/频率不能直接排名。更多限制见[计算口径](FACTOR-CALCULATIONS.md)。
+
+长期数据使用协议沿用现有存储和执行器，暂不新增数据库/框架。将以下时间和版本分开：
+
+| 含义 | 现有记录或约束 |
+|---|---|
+| observationDate | 净值date、统计所属期；仅说明观测对象日期 |
+| availableAt | 该版本最早真实公布/可获得时间；现有基金输入没有，必须记未知 |
+| importedAt | 数据导入记录；不代表过去的可得时间 |
+| frozenAt | 清单createdAt；仅证明本次捕获时刻，不代表历史截面 |
+| revision/source version | 原数据SHA、冻结字节SHA与程序指纹；修订需保留版本，不把新值反填旧结果 |
+
+Agent先区分“现时筛选”“手动篮子历史模拟”“PIT历史因子选择”。基金profile与结果提供temporalEligibility.status=not_point_in_time_verified、historicalFactorSelectionAllowed=false，执行器拒绝因子选择配置；不能只改备注解除约束。最新经理、规模、费用、持仓或名录不进入过去的决策。已落地的后向窗口/信号滞后防止使用未来观测值，但没有真实披露与修订时点时，不宣称全部无前视。
+
+下一批回测Skill须读取上述限制、配置revision和源凭证后才执行；PIT查询未来需要同时满足observationDate与availableAt不晚于决策时刻，并按当时可见修订版本选择。该查询尚未实现，不用伪造availableAt或一律加一天代替真实证据。数据抓取仍采用显式增量与原件保留，未经确认不启动定时任务或重抓历史。
