@@ -131,6 +131,19 @@ class IndustryTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported_industry_benchmark"):
             engine.run(*self.fixture(), config)
 
+    def test_slot_weights_normalize_disable_and_survive_audits(self):
+        slots = [{"familyId": "library.industry.value", "field": f, "weight": 2 if f == "ep" else 0} for f, _, _ in engine.FAMILIES["library.industry.value"]]
+        result = engine.run(*self.fixture(), self.config(slotWeights=slots))
+        self.assertEqual({s["field"]: s["weight"] for s in result["factorDefinitions"][0]["slots"]}, {"bm": 0, "ep": 1, "pbpct": 0, "pepct": 0})
+        self.assertEqual(set(result["decisions"][0]["fieldCoverage"]), {"ep"})
+        self.assertEqual(result["decisions"][0]["scores"][0]["coverage"], 1)
+        self.assertEqual(result["decisions"][0]["scores"][0]["factorDetails"][0]["slotWeight"], 1)
+
+    def test_invalid_zero_duplicate_missing_and_unknown_slots_rejected(self):
+        slots = [{"familyId": "library.industry.value", "field": f, "weight": w} for f, w, _ in engine.FAMILIES["library.industry.value"]]
+        for value in [slots[:-1], [*slots, slots[0]], [{**s,"weight":0} for s in slots], [{**s,"weight":-1} for s in slots], [{**s,"field":"future_price"} for s in slots]]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                engine.validate(self.config(slotWeights=value))
     def test_duplicate_quotes_missing_held_quote_and_benchmark_gaps(self):
         panel, bench, inv = self.fixture()
         with self.assertRaisesRegex(ValueError, "duplicate_industry_source_keys"):

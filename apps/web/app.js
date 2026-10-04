@@ -1,6 +1,7 @@
 import { mountLegacyModule } from './module-loader.js';
 import { fundComparisonGroupValue, fundMetadataEditPayload, isCurrentFundEdit, refreshSnapshotChoices } from './fund-screen-state.js';
 import { industrySaveMethod, latestIndustryConfig, nextIndustryConfigId } from './industry-state.js';
+import { accountModeSeries, compareCurves, csvText, effectiveCosts, resultComparisonKey } from './factor-analysis.js';
 
 document.querySelector('.skip').addEventListener('click', event => {
   event.preventDefault();
@@ -110,27 +111,51 @@ function lineChart(series, options = {}) {
   const width = 760;
   const height = options.height || 260;
   const pad = { l: 46, r: 18, t: 18, b: 30 };
-  const rows = Object.values(series).flat();
-  const values = rows.map(point => point.value).filter(Number.isFinite);
+  const items = options.items || [];
+  const logScale = options.scale === 'log';
+  const valid = point => point && typeof point.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(point.date) && Number.isFinite(Date.parse(point.date)) && Number.isFinite(point.value) && (!logScale || point.value > 0);
+  const rows = items.flatMap(item => (series[item.key] || []).filter(valid));
+  const values = rows.map(point => point.value);
+  const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, class: 'native-chart', role: 'img', 'aria-label': options.label || '日期对齐的序列图' });
+  if (!rows.length) {
+    const text = svg('text', { x: pad.l, y: height / 2, class: 'chart-axis' });
+    text.textContent = '无可显示的有效观测'; root.append(text); return root;
+  }
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = max - min || 1;
-  const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, class: 'native-chart', role: 'img' });
+  const transform = value => logScale ? Math.log(value) : value;
+  const span = transform(max) - transform(min) || 1;
+  const dates = rows.map(point => point.date).sort();
+  const first = dates[0], last = dates.at(-1), start = Date.parse(first), duration = Date.parse(last) - start || 1;
+  root.chartDateDomain = [start, Date.parse(last)];
+  const coordinates = point => [pad.l + (width - pad.l - pad.r) * (Date.parse(point.date) - start) / duration,
+    pad.t + (height - pad.t - pad.b) * (1 - (transform(point.value) - transform(min)) / span)];
   for (let i = 0; i < 4; i++) {
     const y = pad.t + (height - pad.t - pad.b) * (i / 3);
     root.append(svg('line', { x1: pad.l, x2: width - pad.r, y1: y, y2: y, class: 'chart-grid' }));
   }
-  for (const item of options.items) {
+  for (const item of items) {
     const data = series[item.key] || [];
-    const points = data.map((point, index) => {
-      const x = pad.l + (width - pad.l - pad.r) * (index / Math.max(1, data.length - 1));
-      const y = pad.t + (height - pad.t - pad.b) * (1 - ((point.value - min) / span));
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    root.append(svg('polyline', { points, fill: 'none', stroke: item.color, 'stroke-width': item.width || 2.1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    let segment = [];
+    const flush = () => {
+      if (segment.length) root.append(svg('polyline', { points: segment.join(' '), fill: 'none', stroke: item.color, 'stroke-width': item.width || 2.1, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+      segment = [];
+    };
+    for (const point of data) {
+      if (!valid(point)) { flush(); continue; }
+      const [x, y] = coordinates(point);
+      segment.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      const dot = svg('circle', { cx: x, cy: y, r: 3, fill: item.color, opacity: 0.6 });
+      const title = svg('title'); title.textContent = `${item.name || item.key} · ${point.date} · ${fmtNum(point.value, 4)}`;
+      dot.append(title); root.append(dot);
+    }
+    flush();
   }
-  const first = rows[0]?.date || '';
-  const last = rows.at(-1)?.date || '';
+  for (const marker of options.markers || []) {
+    if (!valid(marker) || marker.date < first || marker.date > last) continue;
+    const [x,y]=coordinates(marker), mark=svg('circle',{cx:x,cy:y,r:5,fill:marker.status==='pause'?'#fff':'#a62536',stroke:marker.status==='pause'?'#555':'#a62536','stroke-width':2});
+    const title=svg('title');title.textContent=`${marker.status==='pause'?'停投':'买入'} · ${marker.date} · ${marker.label || ''}`;mark.append(title);root.append(mark);
+  }
   for (const label of [
     { x: pad.l, y: height - 8, text: first },
     { x: width - pad.r - 80, y: height - 8, text: last },
@@ -142,6 +167,52 @@ function lineChart(series, options = {}) {
     root.append(text);
   }
   return root;
+}
+function chartWorkspace(series, options = {}) {
+  const node = element('section'), controls = element('div'), plot = element('div'), status = element('p', '', 'next');
+  const dates = Object.values(series).flat().filter(p => Number.isFinite(p.value)).map(p => p.date).sort();
+  const start = document.createElement('input'), end = document.createElement('input'), scale = document.createElement('select');
+  start.type = end.type = 'date'; start.value = dates[0] || ''; end.value = dates.at(-1) || '';
+  start.setAttribute('aria-label', `${options.label || '图表'}开始日期`); end.setAttribute('aria-label', `${options.label || '图表'}结束日期`);
+  scale.setAttribute('aria-label', `${options.label || '图表'}坐标`); scale.append(option('linear', '线性'), option('log', '对数（正值）'));
+  function draw() {
+    if (start.value > end.value) { plot.replaceChildren(); status.textContent = '开始日期晚于结束日期'; return; }
+    const filtered = Object.fromEntries(Object.entries(series).map(([key, rows]) => [key, rows.filter(p => p.date >= start.value && p.date <= end.value)]));
+    const chart = lineChart(filtered, { ...options, scale: scale.value });
+    status.textContent = `${start.value} → ${end.value}${scale.value === 'log' ? ' · 非正值不显示' : ''}`;
+    chart.addEventListener('wheel', event => { if (!event.ctrlKey) return; event.preventDefault(); zoom(event.deltaY < 0 ? .5 : 2); }, { passive: false });
+    let dragStart = null;
+    const chartDate = event => {
+      const box = chart.getBoundingClientRect(), fraction = Math.max(0, Math.min(1, (event.clientX - box.left - box.width * 46/760) / (box.width * (760-46-18)/760)));
+      const [lo, hi] = chart.chartDateDomain;
+      return new Date(lo + fraction * (hi - lo)).toISOString().slice(0,10);
+    };
+    chart.addEventListener('pointerdown', event => { if (event.button === 0 && chart.chartDateDomain) { dragStart = chartDate(event); chart.setPointerCapture(event.pointerId); } });
+    chart.addEventListener('pointerup', event => { if (!dragStart) return; const release = chartDate(event), pair = [dragStart, release].sort(); dragStart = null; if (pair[0] !== pair[1]) { start.value=pair[0];end.value=pair[1];draw(); } });
+    chart.addEventListener('pointercancel', () => { dragStart = null; });
+    plot.replaceChildren(chart);
+  }
+  function zoom(ratio) {
+    const lo=Date.parse(start.value),hi=Date.parse(end.value); if (!Number.isFinite(lo) || hi<=lo) return;
+    const half=(hi-lo)*ratio/2, center=(hi+lo)/2;
+    start.value=new Date(Math.max(Date.parse(dates[0]),center-half)).toISOString().slice(0,10);
+    end.value=new Date(Math.min(Date.parse(dates.at(-1)),center+half)).toISOString().slice(0,10);draw();
+  }
+  const presets = document.createElement('select'); presets.setAttribute('aria-label', `${options.label || '图表'}快捷区间`);
+  presets.append(option('all', '全部'), option('1', '近1年'), option('3', '近3年'));
+  presets.addEventListener('change', () => { end.value=dates.at(-1)||'';const bound=new Date(end.value);if(presets.value!=='all'&&end.value){bound.setUTCFullYear(bound.getUTCFullYear()-Number(presets.value));start.value=[dates[0],bound.toISOString().slice(0,10)].sort().at(-1);}else start.value=dates[0]||'';draw(); });
+  for (const [title,text,action] of [['放大','+',()=>zoom(.5)],['缩小','-',()=>zoom(2)],['复位','↺',()=>{start.value=dates[0]||'';end.value=dates.at(-1)||'';presets.value='all';draw();}]]) {
+    const button=element('button',text);button.type='button';button.title=title;button.setAttribute('aria-label',`${options.label || '图表'}${title}`);button.addEventListener('click',action);controls.append(button);
+  }
+  const download=element('button','下载图 SVG');download.type='button';download.addEventListener('click',()=>{
+    const chart=plot.querySelector('svg');if(!chart)return;
+    const copy=chart.cloneNode(true),style=svg('style');style.textContent='.chart-axis,.chart-label{fill:#263d35;font:12px sans-serif}.chart-grid{stroke:#dce2de}';copy.prepend(style);
+    downloadFactorFile(new XMLSerializer().serializeToString(copy),'image/svg+xml',`factor-chart-${start.value}-${end.value}.svg`);
+  });controls.append(download);
+  start.addEventListener('change',draw);end.addEventListener('change',draw);scale.addEventListener('change',draw);
+  controls.prepend(start,end,presets,scale);node.append(controls,status,plot);
+  node.setItems = items => { options = { ...options, items }; draw(); };
+  draw();return node;
 }
 function barTrack(item, maxAbs) {
   const row = element('article', null, 'attrib-row');
@@ -192,9 +263,12 @@ async function factorVisualLabPanel() {
   const selected = new Set(['spec', 'opt', 'hs300', 'sA', 'sB', 'sC']);
   const meta = new Map(data.seriesMeta.map(item => [item.key, item]));
   const legend = element('div', null, 'visual-legend');
+  let strategyChart;
   function drawStrategyChart() {
     const items = [...selected].map(key => ({ key, color: meta.get(key)?.color || '#4C8DFF' }));
-    chartBox.replaceChildren(element('h3', '策略净值与分档对比'), lineChart(data.series, { items, height: 300 }), element('p', '可切换策略、基准和A/B/C分档，先恢复旧实验台的对比阅读方式。', 'next'));
+    if (!strategyChart) strategyChart = chartWorkspace(data.series, { items, height: 300, label: '策略净值' });
+    else strategyChart.setItems(items);
+    chartBox.replaceChildren(element('h3', '策略净值与分档对比'), strategyChart);
   }
   for (const item of data.seriesMeta) {
     const label = element('label', null, 'visual-check');
@@ -231,7 +305,7 @@ async function factorVisualLabPanel() {
   const accountCard = element('article', null, 'visual-chart-card');
   accountCard.append(
     element('h3', '账户价值 / 单位净值 / 投入成本'),
-    lineChart(data.account, { height: 260, items: [
+    chartWorkspace(data.account, { height: 260, label: '历史账户', items: [
       { key: 'strategy', color: '#2ED3A0' },
       { key: 'bench_dca', color: '#C9D1DC' },
       { key: 'contributed', color: '#FFB020', width: 1.6 },
@@ -247,7 +321,13 @@ async function factorVisualLabPanel() {
   curveGrid.append(accountCard, sleeveCard);
   const factorGrid = element('section', null, 'visual-two-col');
   const positioning = element('article', null, 'visual-chart-card');
-  positioning.append(element('h3', '因子定位图：单因子超额 × 边际贡献'), positioningPlot(data.factorPositioning));
+  const positionMode = document.createElement('select'); positionMode.setAttribute('aria-label', '因子定位横轴');
+  positionMode.append(option('solo', '单因子超额'), option('rule', '规则化程度（旧定性标注）'));
+  const positionView = element('div');
+  const drawPosition = () => positionView.replaceChildren(positioningPlot(data.factorPositioning, positionMode.value),
+    element('p', positionMode.value === 'rule' ? '规则化程度为旧定义的定性判断，不是实测Alpha或新的因子评分。' : '单因子超额与留一法边际贡献来自旧导出，不是本次新执行。', 'next'));
+  positionMode.addEventListener('change', drawPosition); drawPosition();
+  positioning.append(element('h3', '因子定位图'), positionMode, positionView);
   const attribution = element('article', null, 'visual-chart-card');
   attribution.append(element('h3', 'Alpha / Smart Beta / 残差归因'));
   const maxAbs = Math.max(...data.factorStudy.attribution.map(item => Math.abs(item.value)), 0.01);
@@ -278,7 +358,6 @@ async function experimentComparisonPanel() {
   const data = await response.json();
   const panel = element('section', null, 'experiment-comparison-panel');
   const head = element('section', null, 'comparison-head');
-  const best = data.items[0];
   head.append(
     element('small', 'EXPERIMENT COMPARISON'),
     element('h2', '实验组合对比'),
@@ -289,7 +368,7 @@ async function experimentComparisonPanel() {
     ['对比序列', data.count],
     ['B组权重方案', data.variants.length],
     ['月度索引', data.monthIndexCount],
-    ['当前最优终值', best ? `${best.key} ${fmtNum(best.metrics.finalValue, 2)}` : '-'],
+    ['口径', '同区间净值比较，非IRR排名'],
   ]) {
     const card = element('article', null, 'metric-card');
     card.append(element('small', item[0]), element('strong', String(item[1])));
@@ -299,16 +378,32 @@ async function experimentComparisonPanel() {
   const selected = new Set(['C', 'B_base', 'B_equal', 'A_hs300_gate']);
   const seriesMap = Object.fromEntries(data.items.map(item => [item.key, item.series]));
   const colors = ['#2ED3A0', '#4C8DFF', '#FFB020', '#E85D75', '#8FD14F', '#B987F5', '#46B8E0', '#C9D1DC'];
+  const range = element('section'), start = document.createElement('input'), end = document.createElement('input'), baseline = document.createElement('select');
+  start.type = end.type = 'date'; start.value = data.period[0]; end.value = data.period[1];
+  start.setAttribute('aria-label','对比开始日期');end.setAttribute('aria-label','对比结束日期');baseline.setAttribute('aria-label','对比基线');
+  data.items.forEach(item=>baseline.append(option(item.key,item.label)));baseline.value=data.baselineKey;
+  range.append(start,end,baseline);
+  let rankBody;
   function renderChart() {
+    const comparison = compareCurves(seriesMap, [...selected], baseline.value, start.value, end.value);
     const chartItems = data.items
       .filter(item => selected.has(item.key))
-      .map((item, index) => ({ key: item.key, color: colors[index % colors.length], width: item.key === data.baselineKey ? 2.8 : 2 }));
+      .map(item => ({ key: item.key, name:item.label, color: colors[data.items.indexOf(item) % colors.length], width: item.key === baseline.value ? 2.8 : 2 }));
     chartCard.replaceChildren(
       element('h3', '组合净值对比'),
-      lineChart(seriesMap, { items: chartItems, height: 280 }),
-      element('p', `基线：${data.baselineKey}；不同序列有效起点可能不同，指标已跳过前置空值。`, 'next'),
+      lineChart(comparison.series, { items: chartItems, height: 280 }),
+      element('p', comparison.period ? `${comparison.period.join(' → ')} · ${comparison.observationCount}个同日期观测 · 起点归一为1 · 基线${baseline.value} · 实际日历年化，非账户IRR` : `不能比较：${comparison.status}`, 'next'),
     );
+    if (rankBody) {
+      rankBody.replaceChildren();
+      for (const row of comparison.items) {
+        const item=data.items.find(item=>item.key===row.key), tr=document.createElement('tr');
+        [item.label,comparison.period.join(' → '),fmtNum(row.finalValue,4),fmtPct(row.annualizedReturn),fmtPct(row.maxDrawdown),fmtPct(row.excessAnnualizedReturn)].forEach(value=>tr.append(element('td',value)));
+        rankBody.append(tr);
+      }
+    }
   }
+  [start,end,baseline].forEach(input=>input.addEventListener('change',renderChart));
   const selector = element('section', null, 'comparison-selector');
   for (const item of data.items) {
     const label = element('label', null, 'visual-check');
@@ -330,25 +425,9 @@ async function experimentComparisonPanel() {
   const ranking = element('article', null, 'comparison-card wide-card');
   ranking.append(element('h3', '方案排名与指标'));
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>方案</th><th>组别</th><th>有效起点</th><th>终值</th><th>年化</th><th>回撤</th><th>相对基线</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>方案</th><th>共同区间</th><th>归一终值</th><th>净值年化</th><th>回撤</th><th>相对基线</th></tr></thead>';
   const tbody = document.createElement('tbody');
-  for (const item of data.items) {
-    const tr = document.createElement('tr');
-    for (const value of [
-      `${item.key} · ${item.label}`,
-      item.group,
-      item.metrics.validStartDate || '-',
-      fmtNum(item.metrics.finalValue, 2),
-      fmtPct(item.metrics.annualizedReturn),
-      fmtPct(item.metrics.maxDrawdown),
-      fmtPct(item.metrics.annualizedExcessVsBaseline),
-    ]) {
-      const td = document.createElement('td');
-      td.textContent = String(value);
-      tr.append(td);
-    }
-    tbody.append(tr);
-  }
+  rankBody = tbody; renderChart();
   table.append(tbody);
   ranking.append(table);
   const variants = element('article', null, 'comparison-card wide-card');
@@ -361,7 +440,7 @@ async function experimentComparisonPanel() {
     );
     variants.append(row);
   }
-  grid.append(chartCard, selector, ranking, variants);
+  grid.append(range, chartCard, selector, ranking, variants);
   const notes = element('section', null, 'product-notes');
   notes.append(element('h3', '对比边界'));
   for (const note of data.notes) notes.append(element('p', note));
@@ -980,6 +1059,83 @@ async function legacyArchivePanel() {
   form.append(version, category, search, submit); panel.append(form, status, previous, next, results); await load(); return panel;
 }
 
+async function legacyDcaReplayPanel() {
+  const panel=element('section',null,'strategy-config-workbench');panel.id='legacy-dca-replay';panel.append(element('h2','510300 归档定投与PE择时'));
+  panel.append(element('p','归档假设复算 · not_point_in_time_verified · 当日VWAP/复权份额并非真实成交，观测日滞后不证明历史披露可得时间。','warning'));
+  const form=document.createElement('form'), box=document.createElement('fieldset'), message=element('p','','form-message'), result=element('section');message.setAttribute('role','status');
+  box.className='strategy-grid-form';form.append(box,message);panel.append(form,result);
+  const inputs={};
+  function field(key,label,type='number') {const wrapper=element('label',label),input=document.createElement(type==='select'?'select':'input');input.name=key;if(type!=='select')input.type=type;input.required=!['checkbox','file'].includes(type);wrapper.append(input);box.append(wrapper);inputs[key]=input;return input;}
+  field('archiveId','原件归档版本','select');
+  for(const [key,label,type] of [['amount','每期基准投入（元）'],['fee','佣金比例'],['slippage','滑点比例'],['nth','月内买入日','select'],['startMonth','开始月份','month'],['endMonth','结束月份','month'],['peKey','PE口径','select'],['years','回看年数'],['mode','投入方式','select'],['cashRate','现金年利率'],['timingEnabled','启用PE择时','checkbox']])field(key,label,type);
+  for(const n of [1,2,3,5,10,15,-1])inputs.nth.append(option(String(n),n===-1?'每月最后交易日':`每月第${n}个交易日`));
+  for(const [key,title] of [['TTM','滚动整体PE'],['LYR','静态整体PE'],['MED','成分股PE中位数']])inputs.peKey.append(option(key,title));
+  inputs.mode.append(option('pool','同额承诺现金池'),option('free','实际倍数投入（不同现金流）'));
+  for(const key of ['fee','slippage','cashRate']){inputs[key].min='0';inputs[key].step='.0001';inputs[key].max=key==='cashRate'?'.2':'.1';}
+  inputs.amount.min='100';inputs.amount.max='100000000';inputs.years.min='1';inputs.years.max='20';inputs.years.step='1';
+  const ladder=element('section');ladder.append(element('h3','分位档位与投入倍数'));box.append(ladder);let ladderInputs=[];
+  const run=element('button','复算归档数据');run.type='submit';box.append(run);
+  const reset=element('button','恢复归档默认参数');reset.type='button';box.append(reset);
+  const download=element('button','下载参数 JSON');download.type='button';box.append(download);
+  const upload=field('parameterFile','参数文件','file');upload.accept='.json,application/json';
+  let source=null,defaults=null,generation=0,busy=false;
+  function fill(p) {
+    for(const key of Object.keys(inputs).filter(key=>!['archiveId','parameterFile'].includes(key))) {if(key==='timingEnabled')inputs[key].checked=p[key];else inputs[key].value=p[key];}
+    ladder.replaceChildren(element('h3','分位档位与投入倍数'));ladderInputs=[];
+    for(const bucket of p.ladder){const row=element('label','分位上界（%）'),hi=document.createElement('input'),multiple=document.createElement('input');hi.type=multiple.type='number';hi.min='0';hi.max='100';hi.step='1';hi.value=bucket.hi;multiple.min='0';multiple.max='10';multiple.step='.05';multiple.value=bucket.multiple;hi.setAttribute('aria-label',`分位上界 ${bucket.hi}`);multiple.setAttribute('aria-label',`分位 ${bucket.hi} 投入倍数`);row.append(hi,element('span','投入倍数'),multiple);ladder.append(row);ladderInputs.push({hi,multiple});}
+    result.replaceChildren();message.textContent='';
+  }
+  function parameters(){return Object.fromEntries(Object.keys(defaults).map(key=>[key,key==='ladder'?ladderInputs.map(x=>({hi:Number(x.hi.value),multiple:Number(x.multiple.value)})):key==='timingEnabled'?inputs[key].checked:['startMonth','endMonth','peKey','mode'].includes(key)?inputs[key].value:Number(inputs[key].value)]));}
+  async function load(id='') {
+    const token=++generation;busy=true;box.disabled=true;result.replaceChildren();
+    try {
+      const response=await fetch('/api/modules/factors/v1/legacy-dca/options'+(id?'?'+new URLSearchParams({archiveId:id}):'')),data=await response.json();
+      if(token!==generation)return;if(!response.ok)throw new Error(data.error || '归档行情不可用');
+      source=data.sourceVersion;defaults=data.defaults;inputs.archiveId.replaceChildren();data.archives.forEach(a=>inputs.archiveId.append(option(a.archiveId,`${a.createdAt} · ${a.archiveId.slice(0,12)}`)));inputs.archiveId.value=source.archiveId;fill(defaults);
+      message.textContent=`510300 · ${data.pricePeriod.join(' → ')} · ${data.priceObservations}行情观测 / ${data.peObservations}估值观测 · ${source.sha256}`;
+    } catch(error){if(token===generation){source=null;message.textContent=error.message;}}
+    finally{if(token===generation){busy=false;box.disabled=false;run.disabled=!source;}}
+  }
+  inputs.archiveId.addEventListener('change',()=>load(inputs.archiveId.value));
+  form.addEventListener('change',event=>{if(event.target!==inputs.archiveId&&event.target!==upload){generation++;result.replaceChildren();}});
+  reset.addEventListener('click',()=>{if(!busy&&defaults){generation++;fill(defaults);}});
+  download.addEventListener('click',()=>{if(source&&!busy)downloadFactorFile(JSON.stringify({archiveId:source.archiveId,sourceSha256:source.sha256,parameters:parameters()},null,2),'application/json','510300-replay-parameters.json');});
+  upload.addEventListener('change',async()=>{
+    const file=upload.files?.[0];if(!file||busy)return;const token=++generation;box.disabled=true;busy=true;
+    try{if(file.size>65536)throw new Error('参数文件超过64KiB');const data=JSON.parse(await file.text());if(token!==generation)return;if(data.archiveId!==source?.archiveId||data.sourceSha256!==source?.sha256)throw new Error('参数文件不属于当前归档版本');const p=data.parameters;if(!p||Object.keys(p).sort().join('|')!==Object.keys(defaults).sort().join('|')||typeof p.timingEnabled!=='boolean'||!['pool','free'].includes(p.mode)||!['TTM','LYR','MED'].includes(p.peKey)||!['amount','fee','slippage','nth','years','cashRate'].every(key=>Number.isFinite(p[key]))||!['startMonth','endMonth'].every(key=>typeof p[key]==='string'&&/^\d{4}-\d{2}$/.test(p[key]))||!Array.isArray(p.ladder)||!p.ladder.length||p.ladder.length>12||p.ladder.some(row=>!row||!Number.isFinite(row.hi)||!Number.isFinite(row.multiple)))throw new Error('参数文件结构或类型不完整');fill(p);message.textContent='参数已载入，尚未复算；数值与档位由后端校验。';}
+    catch(error){if(token===generation)message.textContent=error.message;}finally{if(token===generation){busy=false;box.disabled=false;}}
+  });
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(busy||!source)return;const token=++generation,p=parameters();busy=true;box.disabled=true;result.replaceChildren();
+    try{
+      const response=await fetch('/api/modules/factors/v1/legacy-dca/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archiveId:source.archiveId,sourceSha256:source.sha256,parameters:p})}),data=await response.json();
+      if(token!==generation)return;if(!response.ok)throw new Error(data.error || '复算失败');
+      message.textContent=p.mode==='pool'?'已复算：同额承诺现金流；未写配置、请求或结果库。':'已复算：不同实际现金流，终值不可排名；XIRR分别计算，未写配置、请求或结果库。';
+      result.append(resultDiagnosticTable('全期账户指标',['指标','PE策略','固定定投'],[['终值',money(data.metrics.finalValue),money(data.metrics.benchmarkFinalValue)],['累计实际投入',money(data.metrics.totalContributed),money(data.metrics.benchmarkContributed)],['实际日期XIRR',fmtPct(data.metrics.moneyWeightedIrr),fmtPct(data.metrics.benchmarkMoneyWeightedIrr)]]));
+      const mode=document.createElement('select');mode.setAttribute('aria-label','510300复算图表');for(const [key,title]of [['value','账户价值'],['nav','单位净值'],['profit','累计简单收益'],['drawdown','历史高点回撤'],['pe','PE分位'],['excess','择时净值差'],['price','复权价格与均线']])mode.append(option(key,title));
+      const chart=element('section');const draw=()=>{
+        const ledger=data.accountLedger;let series,items,markers=[];
+        if(['profit','drawdown'].includes(mode.value)){series=accountModeSeries(ledger,mode.value);items=[{key:'strategy',name:'PE策略',color:'#a62536'},{key:'benchmark',name:'固定定投',color:'#24764c'}];}
+        else {const keys=mode.value==='value'?['accountValue','benchmarkValue','cash']:mode.value==='nav'?['unitNav','benchmarkNav','lumpBenchmarkNav']:mode.value==='pe'?['pePercentile']:mode.value==='excess'?['timingExcessNav']:['adjustedClose','ma20','ma60','ma200'];series=Object.fromEntries(keys.map(key=>[key,ledger.map(row=>({date:row.date,value:row[key]}))]));const labels={accountValue:'PE账户',benchmarkValue:'固定定投账户',cash:'闲置现金',unitNav:'PE净值',benchmarkNav:'定投净值',lumpBenchmarkNav:'首日一次性买入净值',pePercentile:'前观测日PE分位',timingExcessNav:'PE净值减定投净值（非IRR差）',adjustedClose:'复权收盘',ma20:'MA20',ma60:'MA60',ma200:'MA200'};items=keys.map((key,i)=>({key,name:labels[key],color:['#a62536','#24764c','#2764a5','#777'][i]}));if(mode.value==='price'){const prices=new Map(ledger.map(row=>[row.date,row.adjustedClose]));markers=data.trades.map(row=>({date:row.date,value:prices.get(row.date),status:row.status,label:`${row.multiple}倍 / ${money(row.spend)}元`}));}}
+        chart.replaceChildren(element('p',items.map(x=>x.name).join(' / '),'next'),chartWorkspace(series,{items,markers,label:`510300 ${mode.selectedOptions[0].textContent}`}));};mode.addEventListener('change',draw);result.append(mode,chart);draw();
+      const trades=factorRecordBrowser('510300交易记录',row=>resultDiagnosticTable(row.date,['状态','信号观测日','PE','分位','倍数','投入','买入','现金'],[[row.status,row.signalDate,fmtNum(row.pe),fmtPct(row.percentile),row.multiple,money(row.deposit),money(row.spend),money(row.cash)]]));trades.setItems(data.trades.map(row=>({...row,title:row.date})));result.append(trades.node);
+      const metadata={archiveId:data.sourceVersion.archiveId,sourceSha256:data.sourceVersion.sha256,calculationSources:data.calculationSources,version:data.version,parameters:data.parameters,temporalEligibility:data.temporalEligibility.status};
+      const tradeRows=data.trades.map(row=>({...metadata,...row})),ledgerRows=data.accountLedger.map(row=>({...metadata,...row}));
+      const exports=element('div');
+      for(const [title,extension,content] of [
+        ['下载复算结果 JSON','json',JSON.stringify(data,null,2)],
+        ['下载交易记录 CSV','trades.csv',csvText(tradeRows,[...new Set(tradeRows.flatMap(Object.keys))])],
+        ['下载序列 CSV','series.csv',csvText(ledgerRows,[...new Set(ledgerRows.flatMap(Object.keys))])],
+      ]) {
+        const button=element('button',title);button.type='button';
+        button.addEventListener('click',()=>downloadFactorFile(content,extension==='json'?'application/json':'text/csv;charset=utf-8',`510300-${data.sourceVersion.archiveId.slice(0,12)}.${extension}`));exports.append(button);
+      }
+      result.append(exports,element('p',`${data.temporalEligibility.status} · 当日VWAP与复权份额为归档模拟；MA为全行情历史移动均值，买入/停投标记来自本次实际计划。无约束模式按实际倍数投入，不保留旧负现金借贷口径。净值按投入前未滑点复权VWAP单位化，非昨日账户价值加存款近似。`,'warning'));
+    }catch(error){if(token===generation)message.textContent=error.message;}finally{if(token===generation){busy=false;box.disabled=false;}}
+  });
+  await load();return panel;
+}
+
 async function customExpressionPanel() {
   const panel = element('section', null, 'strategy-config-workbench');
   panel.id = 'custom-expression';
@@ -1283,7 +1439,8 @@ async function customFactorStudioPanel(library) {
   panel.append(head, form);
   return panel;
 }
-function positioningPlot(items) {
+function positioningPlot(items, mode = 'solo') {
+  items = items.filter(item => Number.isFinite(item.marginal) && Number.isFinite(mode === 'rule' ? item.ruleDegree : item.soloExcess));
   const width = 520;
   const height = 280;
   const pad = 38;
@@ -1292,21 +1449,23 @@ function positioningPlot(items) {
   const maxAbsX = Math.max(...xValues.map(Math.abs), 0.01);
   const maxAbsY = Math.max(...yValues.map(Math.abs), 0.01);
   const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, class: 'position-chart', role: 'img' });
-  const x0 = width / 2;
+  const x0 = mode === 'rule' ? pad + (width - pad * 2) * .7 : width / 2;
   const y0 = height / 2;
   root.append(svg('line', { x1: pad, x2: width - pad, y1: y0, y2: y0, class: 'chart-grid strong' }));
   root.append(svg('line', { x1: x0, x2: x0, y1: pad, y2: height - pad, class: 'chart-grid strong' }));
   for (const item of items) {
-    const x = x0 + (item.soloExcess / maxAbsX) * (width / 2 - pad);
+    const x = mode === 'rule' ? pad + item.ruleDegree * (width - pad * 2) : x0 + (item.soloExcess / maxAbsX) * (width / 2 - pad);
     const y = y0 - (item.marginal / maxAbsY) * (height / 2 - pad);
     const color = item.kind === 'sb' ? '#46B8E0' : '#FFB020';
-    root.append(svg('circle', { cx: x, cy: y, r: 8 + item.weight * 18, fill: color, opacity: '0.82' }));
-    const label = svg('text', { x: x + 10, y: y - 8, class: 'chart-label' });
+    const dot=svg('circle', { cx: x, cy: y, r: 8 + item.weight * 18, fill: color, opacity: '0.82' });
+    const title=svg('title');title.textContent=`${item.label} · ${mode==='rule'?item.ruleDegree:fmtPct(item.soloExcess)} · 边际 ${fmtPct(item.marginal)}`;dot.append(title);root.append(dot);
+    const near = x > width - pad - 60;
+    const label = svg('text', { x: near ? x - 10 : x + 10, y: y - 8, 'text-anchor': near ? 'end' : 'start', class: 'chart-label' });
     label.textContent = item.label;
     root.append(label);
   }
   const xLabel = svg('text', { x: pad, y: height - 10, class: 'chart-axis' });
-  xLabel.textContent = '单因子超额';
+  xLabel.textContent = mode === 'rule' ? '规则化程度 0–1（定性）' : '单因子超额';
   const yLabel = svg('text', { x: width - 118, y: height - 10, class: 'chart-axis' });
   yLabel.textContent = '边际贡献';
   root.append(xLabel, yLabel);
@@ -1582,11 +1741,23 @@ async function industryConfigPanel(library) {
     weight.setAttribute('aria-label', `${definition?.title || family.familyId} 权重`);
     row.append(element('span', family.familyId === 'library.industry.size_liquidity' ? '成交占比流动性（非市值规模）' : definition?.title || family.familyId), element('small', '相对权重'), check, weight);
     form.querySelector('.factor-weight-list').append(row);
-    fields.push({ id: family.familyId, check, weight });
+    const entry = { id: family.familyId, check, weight, slots: [] }; fields.push(entry);
     const detail = document.createElement('details'); detail.append(element('summary', `${definition?.title || family.familyId} · 计算槽位`));
-    detail.append(resultDiagnosticTable('固定子因子定义', ['字段', '计算逻辑', '方向', '类内权重'], family.slots.map(slot => [slot.field, slot.formula, slot.sign > 0 ? '高优先' : '低优先', fmtPct(slot.weight)])));
+    for (const slot of family.slots) {
+      const line = element('label', null, 'weight-row'), enabled = document.createElement('input'), relative = document.createElement('input');
+      enabled.type = 'checkbox'; enabled.checked = true; enabled.setAttribute('aria-label', `${slot.field} 子因子启用`);
+      relative.type = 'number'; relative.min = '0'; relative.max = '100'; relative.step = '0.01'; relative.value = slot.weight; relative.setAttribute('aria-label', `${slot.field} 子因子相对权重`);
+      line.append(enabled, element('span', slot.field), relative, element('small', `${slot.formula} · ${slot.sign > 0 ? '高值优先' : '低值优先'}`)); detail.append(line);
+      entry.slots.push({ field: slot.field, defaultWeight: slot.weight, enabled, relative });
+    }
     panel.append(detail);
   }
+  const slotActions = element('div');
+  for (const [label, action] of [['清零全部因子', () => fields.forEach(f => { f.check.checked = false; f.slots.forEach(s => {s.enabled.checked = false;s.relative.value = '0';}); })],
+    ['恢复模板因子权重', () => fields.forEach(f => {f.check.checked = template.factorFamilyIds.includes(f.id);f.weight.value = template.factorWeights.find(w => w.factorFamilyId === f.id)?.weight || 1;f.slots.forEach(s => {s.enabled.checked = true;s.relative.value = s.defaultWeight;});})]]) {
+    const button = element('button', label); button.type = 'button'; button.addEventListener('click', action); slotActions.append(button);
+  }
+  form.querySelector('.factor-weight-list').append(slotActions);
   await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.etf_smartbeta.industry_execution.current');
   refreshIndustrySnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.etf_smartbeta.industry_execution.current'); };
   let generation = 0;
@@ -1617,6 +1788,11 @@ async function industryConfigPanel(library) {
     for (const field of fields) {
       field.check.checked = (item.factorFamilyIds || []).includes(field.id);
       field.weight.value = item.factorWeights?.find(w => w.factorFamilyId === field.id)?.weight || '1';
+      for (const slot of field.slots) {
+        const saved = s.slotWeights?.find(w => w.familyId === field.id && w.field === slot.field);
+        slot.relative.value = saved?.weight ?? slot.defaultWeight;
+        slot.enabled.checked = Number(slot.relative.value) > 0;
+      }
     }
     message.textContent = '';
     renderSaved();
@@ -1641,13 +1817,15 @@ async function industryConfigPanel(library) {
     if (saving) return;
     const factorWeights = fields.filter(field => field.check.checked).map(field => ({ factorFamilyId: field.id, weight: Number(field.weight.value) }));
     if (!factorWeights.length || factorWeights.some(x => !Number.isFinite(x.weight) || x.weight <= 0)) { message.textContent = '至少选择一个因子，并设置正权重。'; return; }
+    const slotWeights = fields.filter(f => f.check.checked).flatMap(f => f.slots.map(s => ({familyId:f.id,field:s.field,weight:s.enabled.checked ? Number(s.relative.value) : 0})));
+    if (slotWeights.some(s => !Number.isFinite(s.weight) || s.weight < 0 || s.weight > 100) || factorWeights.some(f => !slotWeights.some(s => s.familyId === f.factorFamilyId && s.weight > 0))) { message.textContent = '每个启用因子至少保留一个正权重子因子；子因子权重须为0至100。'; return; }
     if (Number(form.elements.minInvestable.value) < Number(form.elements.topN.value)) { message.textContent = '最少合格行业不能小于TopN。'; return; }
     const configId = formValue(form, 'configId');
     const sentGeneration = generation;
     const payload = { ...template, configId, title: formValue(form, 'title'), snapshotId: formValue(form, 'snapshotId'), benchmarkId: formValue(form, 'benchmarkId'), rebalanceCalendar: formValue(form, 'rebalanceCalendar'),
       factorFamilyIds: factorWeights.map(x => x.factorFamilyId), factorWeights, notes: formValue(form, 'notes'),
       costModel: ['commission', 'slippage', 'annual_fee'].map(key => `${key}=${formValue(form, key)}`).join(';'),
-      strategySettings: { startDate: formValue(form, 'startDate'), endDate: formValue(form, 'endDate'), topN: Number(form.elements.topN.value), minInvestable: Number(form.elements.minInvestable.value), signalLagDays: Number(form.elements.signalLagDays.value), weightingMethod: formValue(form, 'weightingMethod'), missingValuePolicy: 'neutral_with_coverage' } };
+      strategySettings: { startDate: formValue(form, 'startDate'), endDate: formValue(form, 'endDate'), topN: Number(form.elements.topN.value), minInvestable: Number(form.elements.minInvestable.value), signalLagDays: Number(form.elements.signalLagDays.value), weightingMethod: formValue(form, 'weightingMethod'), missingValuePolicy: 'neutral_with_coverage', slotWeights } };
     const method = industrySaveMethod(editingId, configId);
     saving = true;
     const submit = form.querySelector('[type=submit]'); submit.disabled = true;
@@ -2526,6 +2704,45 @@ async function backtestToolsPanel() {
   return panel;
 }
 
+function factorRecordBrowser(label, renderRow) {
+  const node = element('section'), controls = element('div'), list = element('div');
+  const query = document.createElement('input'); query.type = 'search'; query.setAttribute('aria-label', `${label}查询`);
+  const previous = element('button', '<'), next = element('button', '>'), status = element('span');
+  previous.type = next.type = 'button'; previous.setAttribute('aria-label', `${label}上一页`); next.setAttribute('aria-label', `${label}下一页`);
+  let records = [], offset = 0;
+  function draw() {
+    const term = query.value.trim().toLowerCase();
+    const matches = records.filter(row => [row.title, row.configId, row.requestId, row.artifactId, row.status].some(value => String(value || '').toLowerCase().includes(term)));
+    offset = Math.min(offset, Math.max(0, Math.ceil(matches.length / 10) - 1) * 10);
+    list.replaceChildren(...matches.slice(offset, offset + 10).map(renderRow));
+    if (!matches.length) list.append(element('p', '暂无匹配记录', 'next'));
+    status.textContent = `${matches.length ? offset + 1 : 0}–${Math.min(offset + 10, matches.length)} / ${matches.length}`;
+    previous.disabled = offset === 0; next.disabled = offset + 10 >= matches.length;
+  }
+  query.addEventListener('input', () => { offset = 0; draw(); });
+  previous.addEventListener('click', () => { if (offset) { offset -= 10; draw(); } });
+  next.addEventListener('click', () => { offset += 10; draw(); });
+  controls.append(query, previous, status, next); node.append(controls, list);
+  return { node, setItems(items) { records = items; draw(); } };
+}
+function downloadFactorFile(content, type, name) {
+  const url = URL.createObjectURL(new Blob([content], { type })), link = document.createElement('a');
+  link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function resultExportPanel(item) {
+  const node = element('section'), buttons = element('div'), message = element('p', '', 'form-message');
+  const base = item.artifactId.replace(/[^a-z0-9_.-]/gi, '_');
+  const metadata = { artifactId:item.artifactId, configRevision:item.configSnapshot?.configRevision, snapshotId:item.configSnapshot?.snapshotId,
+    benchmarkId:item.configSnapshot?.benchmarkId, costModel:item.configSnapshot?.costModel, effectiveCosts:effectiveCosts(item.configSnapshot),
+    sourceVersions:JSON.stringify(item.dataScope?.sourceVersions || item.dataScope?.sourceVersion || null),
+    preflightSha256:item.dataScope?.workflowReceipt?.preflightSha256 || null, temporalEligibility:'not_point_in_time_verified' };
+  for (const [label, action] of [
+    ['下载账户账本 CSV', () => {const rows=(item.accountLedger || []).map(row=>({...metadata,...row}));downloadFactorFile(csvText(rows,[...new Set(rows.flatMap(Object.keys))]),'text/csv;charset=utf-8',`${base}-ledger.csv`);} ],
+    ['下载现金流 CSV', () => {const rows=(item.cashFlows || []).map(row=>({...metadata,...row}));downloadFactorFile(csvText(rows,[...new Set(rows.flatMap(Object.keys))]),'text/csv;charset=utf-8',`${base}-flows.csv`);} ],
+    ['下载完整结果 JSON', () => downloadFactorFile(JSON.stringify(item,null,2),'application/json',`${base}.json`)],
+  ]) { const button=element('button',label);button.type='button';button.disabled=label.includes('账本')?!item.accountLedger?.length:label.includes('现金流')?!item.cashFlows?.length:false;button.addEventListener('click',()=>{try{action();message.textContent='已生成本地下载';}catch{message.textContent='下载失败，原结果未改动';}});buttons.append(button); }
+  node.append(element('h4','结果导出'),buttons,message);return node;
+}
 async function executionPlanPanel() {
   let plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
   let results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
@@ -2547,9 +2764,66 @@ async function executionPlanPanel() {
   const requests = element('article', null, 'execution-card');
   const resultCard = element('article', null, 'execution-card result-artifact-card');
   const resultDetail = element('article', null, 'execution-card result-detail-card wide-card');
+  const comparePanel = element('section'), compared = new Map(), compareMessage = element('p', '', 'warning');
+  function drawCompared() {
+    const entries=[...compared.values()], series=Object.fromEntries(entries.map(item=>[item.artifactId,item.accountLedger.map(row=>({date:row.date,value:row.unitNav}))]));
+    const result=compareCurves(series,entries.map(item=>item.artifactId),entries[0]?.artifactId);
+    comparePanel.replaceChildren(element('h3','本次结果对比'),compareMessage);
+    for(const item of entries){const remove=element('button',`移出 ${item.title}`);remove.type='button';remove.addEventListener('click',()=>{compared.delete(item.artifactId);drawCompared();});comparePanel.append(remove);}
+    if(entries.length)comparePanel.append(element('p',result.period?`${result.period.join(' → ')} · 同源/成本/基准/日历的净值归一比较，非IRR排名`:`不能比较：${result.status}`),
+      lineChart(result.series,{items:entries.map((item,i)=>({key:item.artifactId,name:item.title,color:['#267766','#ba4f58','#727b78','#397aaf'][i%4]}))}),
+      resultDiagnosticTable('共同区间指标',['结果','归一终值','净值年化','回撤','相对首个结果'],result.items.map(row=>[row.key,fmtNum(row.finalValue,4),fmtPct(row.annualizedReturn),fmtPct(row.maxDrawdown),fmtPct(row.excessAnnualizedReturn)])));
+  }
   const form = document.createElement('form');
   form.className = 'execution-card';
   let selectedResultId = results.items.at(-1)?.artifactId || null;
+  let detailGeneration = 0;
+  const requestBrowser = factorRecordBrowser('运行请求', item => {
+      const row = element('div', null, 'request-row');
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.textContent = item.resultArtifactId ? '已生成' : '生成结果';
+      action.disabled = Boolean(item.resultArtifactId) || item.requestedMode === 'guarded_backtest';
+      const errorMessage = element('p', '', 'warning');
+      errorMessage.setAttribute('role', 'status');
+      action.addEventListener('click', async () => {
+        action.textContent = '生成中'; action.disabled = true; errorMessage.textContent = '';
+        try {
+          const response = await fetch(`/api/modules/factors/v1/run-requests/${encodeURIComponent(item.requestId)}/execute`, { method: 'POST' });
+          const result = await response.json();
+          if (!response.ok) throw new Error(`执行失败：${result.error || '暂不可用'}；先核对版本和已存结果。`);
+          plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
+          results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
+          selectedResultId = result.resultArtifact.artifactId;
+          renderReadiness(); renderRequests(); renderResults(); await renderResultDetail();
+        } catch (error) {
+          action.textContent = '核对后执行'; action.disabled = false; errorMessage.textContent = error.message;
+        }
+      });
+      row.append(element('span', item.title), action, element('small', `${item.configId} · ${item.requestId} · ${item.status}`), errorMessage);
+      return row;
+  });
+  const resultBrowser = factorRecordBrowser('结果资产', item => {
+      const row = element('div', null, 'result-row'), select = document.createElement('button');
+      select.type = 'button'; select.textContent = item.artifactId === selectedResultId ? '查看中' : '查看'; select.disabled = item.artifactId === selectedResultId;
+      select.addEventListener('click', async () => { selectedResultId = item.artifactId; renderResults(); await renderResultDetail(); });
+      row.append(element('span', item.title), select,
+        element('b', item.artifactType === 'fund_cross_section_screen' ? `${item.metrics.selectedCount}个候选` : fmtPct(item.metrics.excessAnnualizedReturn ?? item.metrics.excessIrr)),
+        element('small', `${item.artifactId} · ${item.status}`));
+      const compare = element('button','加入对比');compare.type='button';compare.disabled=item.artifactType==='fund_cross_section_screen';
+      compare.addEventListener('click',async()=>{
+        compare.disabled=true;
+        try {
+          const response=await fetch(`/api/modules/factors/v1/result-artifacts/${encodeURIComponent(item.artifactId)}`),payload=await response.json();
+          if(!response.ok)throw new Error(payload.error||'读取失败');
+          const key=resultComparisonKey(payload.item),first=[...compared.values()][0];
+          if(!key||first&&key!==resultComparisonKey(first))throw new Error('结果数据版本、基准、成本、日历或投入规则不一致，不能合并比较');
+          if(compared.size>=4&&!compared.has(item.artifactId))throw new Error('本次最多比较4个结果');
+          compared.set(item.artifactId,payload.item);compareMessage.textContent='';drawCompared();
+        }catch(error){compareMessage.textContent=error.message;}finally{compare.disabled=false;}
+      });row.append(compare);
+      return row;
+  });
   function renderReadiness() {
     readiness.replaceChildren(element('h3', '配置草案就绪检查'));
     if (!plan.configReadiness.length) {
@@ -2567,109 +2841,34 @@ async function executionPlanPanel() {
     }
   }
   function renderRequests() {
-    requests.replaceChildren(element('h3', '运行请求记录'));
-    if (!plan.runRequests.length) {
-      requests.append(element('p', '还没有运行请求。', 'next'));
-      return;
-    }
-    for (const item of plan.runRequests.slice(-5).reverse()) {
-      const row = element('div', null, 'request-row');
-      const action = document.createElement('button');
-      action.type = 'button';
-      action.textContent = item.resultArtifactId ? '已生成' : '生成结果';
-      action.disabled = Boolean(item.resultArtifactId);
-      const errorMessage = element('p', '', 'warning');
-      errorMessage.setAttribute('role', 'status');
-      action.addEventListener('click', async () => {
-        action.textContent = '生成中';
-        action.disabled = true;
-        errorMessage.textContent = '';
-        try {
-          const response = await fetch(`/api/modules/factors/v1/run-requests/${encodeURIComponent(item.requestId)}/execute`, { method: 'POST' });
-          const result = await response.json();
-          if (!response.ok) {
-            const messages = {
-              unsupported_dca_bucket_policy: '该分档策略尚未接入计算，请选择单一宽基或宽基/现金配置。',
-              unsupported_dca_execution_rule: '该交易规则尚未接入计算。',
-              dca_structured_rule_required: '旧草案含有文字交易规则，请在定投配置面板选择明确的交易规则后保存。',
-              dca_factor_selection_not_supported: '固定宽基定投不执行因子选股；请在定投配置面板重新保存配置。',
-              unsupported_dca_frequency: '当前支持月度、周度或双周定投。',
-              unsupported_dca_benchmark: '请选择沪深300或中证1000全收益基准。',
-              dca_period_outside_data_coverage: '配置区间超出现有数据覆盖范围，请核对历史数据日期。',
-              invalid_dca_bucket_weights: '资金分档比例必须为非负且合计100%。',
-              unsupported_dca_cost_model: '费用字段尚不支持；请在定投配置面板填写佣金、滑点和宽基年费率。',
-              invalid_dca_price_data: '源数据价格缺失、无效或为零，无法执行该区间。',
-              dca_source_changed_retry: '计算期间源数据发生变化，请重新运行。',
-              unsupported_factor_execution_config: '该配置尚未接入可执行引擎。',
-              fund_source_profile_required: '请在基金宽表配置区读取分组并重新保存配置。',
-              fund_source_version_changed_reload_profile: '宽表版本已变化，请重新读取分组并保存配置。',
-              fund_rank_fields_required: '旧草案尚未绑定具体排序字段，请在基金宽表配置区补齐。',
-              fund_factor_field_unavailable: '配置字段在当前宽表中不可用。',
-              fund_screen_no_valid_factor_rows: '所选组及字段没有完整有效样本，请复核缺失策略。',
-              fund_screen_empty_after_filters: '筛选后无样本，请复核主份额和历史年数条件。',
-              fund_rank_field_has_no_valid_values: '所选组中至少一个字段完全缺失，无法排序。',
-              fund_relative_factor_benchmark_required: '基准相对因子要求明确基准及基准口径。',
-              frozen_snapshot_integrity_failed: '冻结副本内容与清单不一致，已拒绝计算；请在数据层校验此版本。',
-              frozen_snapshot_not_found: '原配置绑定的冻结版本不存在，不能自动换用当前数据。',
-              snapshot_comparison_group_mismatch: '冻结版本类型与策略类型不一致。',
-            };
-            throw new Error(messages[result.error] || `执行失败：${result.error || '暂不可用'}`);
-          }
-          plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
-          results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
-          selectedResultId = result.resultArtifact.artifactId;
-          renderReadiness(); renderRequests(); renderResults(); await renderResultDetail();
-        } catch (error) {
-          action.textContent = '重试';
-          action.disabled = false;
-          errorMessage.textContent = error.message;
-        }
-      });
-      row.append(element('span', item.title), action, element('small', `${item.configId} · ${item.artifactCandidateId} · ${item.status}`), errorMessage);
-      requests.append(row);
-    }
+    requests.replaceChildren(element('h3', '运行请求记录'), requestBrowser.node);
+    requestBrowser.setItems(plan.runRequests.slice().reverse());
   }
   function renderResults() {
-    resultCard.replaceChildren(element('h3', '结果资产库'));
+    resultCard.replaceChildren(element('h3', '结果资产库'), resultBrowser.node);
     if (!results.items.length) {
-      resultCard.append(element('p', '还没有生成结果资产。先创建运行请求，再生成结果。', 'next'));
-      resultDetail.replaceChildren(element('h3', '结果资产详情'), element('p', '生成结果后，这里会显示指标、持仓、归因、敏感度和审计警示。', 'next'));
-      return;
-    }
-    if (!selectedResultId || !results.items.some(item => item.artifactId === selectedResultId)) selectedResultId = results.items.at(-1)?.artifactId;
-    for (const item of results.items.slice(-4).reverse()) {
-      const row = element('div', null, 'result-row');
-      const select = document.createElement('button');
-      select.type = 'button';
-      select.textContent = item.artifactId === selectedResultId ? '查看中' : '查看';
-      select.disabled = item.artifactId === selectedResultId;
-      select.addEventListener('click', async () => {
-        selectedResultId = item.artifactId;
-        renderResults();
-        await renderResultDetail();
-      });
-      row.append(
-        element('span', item.title),
-        select,
-        element('b', item.artifactType === 'fund_cross_section_screen' ? `${item.metrics.selectedCount}个候选` : fmtPct(item.metrics.excessAnnualizedReturn ?? item.metrics.excessIrr)),
-        element('small', `${item.artifactId} · ${item.status}`),
-      );
-      resultCard.append(row);
-    }
+      selectedResultId = null;
+      detailGeneration++;
+      resultDetail.replaceChildren(element('h3', '结果资产详情'), element('p', '还没有可查看的结果资产。', 'next'));
+    } else if (!selectedResultId || !results.items.some(item => item.artifactId === selectedResultId)) selectedResultId = results.items.at(-1).artifactId;
+    resultBrowser.setItems(results.items.slice().reverse());
   }
   async function renderResultDetail() {
+    const generation = ++detailGeneration, requestedId = selectedResultId;
     resultDetail.replaceChildren(element('h3', '结果资产详情'));
     if (!selectedResultId) {
       resultDetail.append(element('p', '还没有可查看的结果资产。', 'next'));
       return;
     }
-    const response = await fetch(`/api/modules/factors/v1/result-artifacts/${encodeURIComponent(selectedResultId)}`);
+    const response = await fetch(`/api/modules/factors/v1/result-artifacts/${encodeURIComponent(requestedId)}`);
     const payload = await response.json();
+    if (generation !== detailGeneration || requestedId !== selectedResultId) return;
     if (!response.ok) {
       resultDetail.append(element('p', payload.error || '结果资产详情读取失败', 'warning'));
       return;
     }
     const item = payload.item;
+    resultDetail.append(resultExportPanel(item));
     const computedAttribution = industryAttributionPanel(item.attribution);
     if (computedAttribution) resultDetail.append(computedAttribution);
     const cashflowAttribution = cashflowAttributionPanel(item.attribution);
@@ -2740,15 +2939,20 @@ async function executionPlanPanel() {
       curves.append(element('h4', '账户与基准对比'));
       const modes = document.createElement('select');
       modes.setAttribute('aria-label', '账户曲线口径');
-      modes.append(option('value', '账户价值 / 累计投入'), option('nav', '时间加权净值'));
+      modes.append(option('value', '账户价值 / 累计投入'), option('nav', '时间加权净值'), option('profit','累计简单收益（损益/投入）'), option('drawdown','净值回撤'));
       const legend = element('p', '绿色：账户 · 红色：基准 · 灰色：累计投入');
       const plot = element('div');
       function drawCurves() {
+        if (['profit','drawdown'].includes(modes.value)) {
+          const series=accountModeSeries(item.accountLedger || [],modes.value);
+          plot.replaceChildren(chartWorkspace(series,{label:'账户派生曲线',height:260,items:[{key:'strategy',name:'账户',color:'#267766'},{key:'benchmark',name:'基准',color:'#ba4f58'}]}));
+          legend.textContent=modes.value==='profit'?'损益/累计投入，非TWR或IRR；零投入留空':'按完整历史净值峰值计算回撤，不因查看区间重置峰值';return;
+        }
         const nav = modes.value === 'nav';
         const items = nav ? [{ key: 'unitNav', color: '#267766' }, { key: 'benchmarkNav', color: '#ba4f58' }]
           : [{ key: 'accountValue', color: '#267766' }, { key: 'benchmarkValue', color: '#ba4f58' }, { key: 'contributed', color: '#727b78' }];
         const series = Object.fromEntries(items.map(item => [item.key, payload.item.series[item.key] || []]));
-        plot.replaceChildren(lineChart(series, { items, height: 260 }));
+        plot.replaceChildren(chartWorkspace(series, { label:'账户曲线', items, height: 260 }));
         legend.textContent = nav ? '绿色：账户净值 · 红色：基准净值' : '绿色：账户 · 红色：基准 · 灰色：累计投入';
       }
       modes.addEventListener('change', drawCurves);
@@ -2915,7 +3119,7 @@ async function executionPlanPanel() {
   renderResults();
   await renderResultDetail();
   renderForm();
-  body.append(readiness, form, requests, resultCard, resultDetail);
+  drawCompared(); body.append(readiness, form, requests, resultCard, resultDetail, comparePanel);
   const notes = element('section', null, 'execution-notes');
   for (const note of plan.notes) notes.append(element('p', note));
   panel.append(head, stages, body, notes);
@@ -3285,6 +3489,7 @@ try {
     if (selected.id === 'factors') {
       const library = await (await fetch('/api/modules/factors/v1/library')).json();
       content.append(await factorVisualLabPanel());
+      content.append(await legacyDcaReplayPanel());
       content.append(await experimentComparisonPanel());
       content.append(await factorProductConsolePanel());
       content.append(await factorDataLayerPanel());

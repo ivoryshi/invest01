@@ -105,7 +105,7 @@ class ExpressionTest(unittest.TestCase):
     def test_hash_and_revision_settings_rejected(self):
         config=self.config();config['strategySettings']['factorProgram']['executionSha256']='0'*64
         with self.assertRaisesRegex(ValueError,'hash_mismatch'):engine.run(*self.data(),config)
-        for settings in [{'signalLagDays':0},{'missingValuePolicy':'fill_zero'},{'extra':1}]:
+        for settings in [{'signalLagDays':0},{'missingValuePolicy':'fill_zero'},{'extra':1},{'slotWeights':[]}]:
             with self.assertRaises(ValueError):engine.run(*self.data(),self.config(**settings))
 
     def test_selected_definition_copy_not_latest_library(self):

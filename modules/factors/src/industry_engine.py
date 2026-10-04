@@ -78,7 +78,7 @@ def validate(config):
     s = config.get("strategySettings", {})
     if not isinstance(s, dict):
         raise ValueError("industry_settings_required")
-    allowed = {"startDate", "endDate", "topN", "signalLagDays", "minInvestable", "weightingMethod", "missingValuePolicy"}
+    allowed = {"startDate", "endDate", "topN", "signalLagDays", "minInvestable", "weightingMethod", "missingValuePolicy", "slotWeights"}
     if set(s) - allowed or config.get("transactionSettings"):
         raise ValueError("unsupported_industry_strategy_settings")
     if config.get("strategyTemplateId") != "strategy.industry_parquet_monthly_topn" or config.get("universe") != "sw_industry_and_etf_proxy":
@@ -118,16 +118,33 @@ def validate(config):
         seen.add(key)
     if rates["commission"] + rates["slippage"] > .1:
         raise ValueError("invalid_industry_cost_rate")
-    return {"start": start, "end": end, "top": top, "lag": lag, "minimum": minimum, "weights": w, "rates": rates}
+    slots = {family: FAMILIES[family] for family in families}
+    if "slotWeights" in s:
+        submitted = s["slotWeights"]
+        expected = {(family, field) for family in families for field, _, _ in FAMILIES[family]}
+        if not isinstance(submitted, list) or any(not isinstance(x, dict) or set(x) != {"familyId", "field", "weight"} for x in submitted):
+            raise ValueError("invalid_industry_slot_weights")
+        pairs = [(x["familyId"], x["field"]) for x in submitted]
+        if len(set(pairs)) != len(pairs) or set(pairs) != expected:
+            raise ValueError("industry_slot_binding_mismatch")
+        values = {(x["familyId"], x["field"]): number(x["weight"], "invalid_industry_slot_weight", 0, 100) for x in submitted}
+        for family in families:
+            total = math.fsum(values[(family, field)] for field, _, _ in FAMILIES[family])
+            if total <= 0:
+                raise ValueError("industry_selected_family_has_no_positive_slot")
+            slots[family] = [(field, values[(family, field)] / total, sign) for field, _, sign in FAMILIES[family]]
+    return {"start": start, "end": end, "top": top, "lag": lag, "minimum": minimum, "weights": w, "rates": rates, "slots": slots}
 
 
-def score(day, weights):
+def score(day, weights, slots=None):
     day = day.set_index("ind").sort_index()
     totals = pd.Series(0., index=day.index)
     coverage = pd.Series(0., index=day.index)
     details, field_coverage = {}, {}
     for family, family_weight in weights.items():
-        for field, slot_weight, sign in FAMILIES[family]:
+        for field, slot_weight, sign in (slots or FAMILIES)[family]:
+            if slot_weight == 0:
+                continue
             raw = day[field].replace([np.inf, -np.inf], np.nan)
             count = int(raw.notna().sum())
             field_coverage[field] = count
@@ -285,9 +302,15 @@ def simulate(data, bench, inv, parameters, score_fn=score, context=None, audit=T
         if date in monthly:
             day_index = int(days.get_loc(date)) - p["lag"]
             signal_date = days[day_index] if day_index >= 0 else None
-            key = (score_fn, signal_date, tuple(sorted(p['weights'].items())))
+            slot_key = tuple((family, tuple(p['slots'][family])) for family in sorted(p['weights'])) if score_fn is score and p.get('slots') else ()
+            key = (score_fn, signal_date, tuple(sorted(p['weights'].items())), slot_key)
             if key not in context['scoreCache']:
-                context['scoreCache'][key] = score_fn(by_day[signal_date].reset_index(drop=True), p['weights']) if signal_date is not None else ([], {})
+                if signal_date is None:
+                    context['scoreCache'][key] = ([], {})
+                elif score_fn is score:
+                    context['scoreCache'][key] = score_fn(by_day[signal_date].reset_index(drop=True), p['weights'], p.get('slots'))
+                else:
+                    context['scoreCache'][key] = score_fn(by_day[signal_date].reset_index(drop=True), p['weights'])
             ranked, field_coverage = context['scoreCache'][key]
             eligible = [r for r in ranked if r["code"] in current.index and pd.notna(inv.get(r["name"])) and inv[r["name"]] <= date]
             selected = eligible[:p["top"]] if len(eligible) >= p["minimum"] else []
@@ -391,7 +414,7 @@ def run(panel, bench, investable, config):
     data["previousDate"] = data.groupby("ind")["date"].shift(1)
     context = simulation_context(data,benchmark,parameters)
     result = simulate(data, benchmark, inv, parameters, context=context)
-    result["factorDefinitions"] = [{"familyId": family, "weight": weight, "slots": [{"field": f, "formula": FORMULAS[f], "weight": w, "sign": sign} for f, w, sign in FAMILIES[family]]} for family, weight in parameters["weights"].items()]
+    result["factorDefinitions"] = [{"familyId": family, "weight": weight, "slots": [{"field": f, "formula": FORMULAS[f], "weight": w, "sign": sign} for f, w, sign in parameters["slots"][family]]} for family, weight in parameters["weights"].items()]
     result["costRates"] = parameters["rates"]
     result["signalLagDays"] = parameters["lag"]
     result['sensitivity'] = sensitivity_runs(data, benchmark, inv, parameters, result, context=context)

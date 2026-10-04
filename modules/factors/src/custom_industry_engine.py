@@ -30,6 +30,8 @@ def parameters(config):
     s = config.get('strategySettings')
     if not isinstance(s,dict) or 'factorProgram' not in s or s.get('missingValuePolicy') != 'complete_case':
         raise ValueError('custom_industry_program_required')
+    if 'slotWeights' in s:
+        raise ValueError('custom_industry_uses_program_node_weights_not_industry_slots')
     program = s['factorProgram']
     if not isinstance(program,dict) or set(program) != {'factorFamilyId','revision','executionSha256','executionSpec'} or isinstance(program['revision'],bool) or not isinstance(program['revision'],int) or program['revision'] < 1:
         raise ValueError('custom_industry_bound_program_required')

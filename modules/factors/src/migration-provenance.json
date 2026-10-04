@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "module": "factors",
-  "date": "2026-10-01",
+  "date": "2026-10-04",
   "items": [
     {
       "target": "modules/factors/src/dca_engine.py:xirr",
@@ -13,6 +13,20 @@
         "Report a result warning when no solution exists within those bounds."
       ],
       "sourcePolicy": "read_only_no_old_script_execution"
+    },
+    {
+      "target": "modules/factors/src/legacy_dca_engine.py",
+      "source": "/Users/samshi/Desktop/My Claude/etf-smartbeta/src/沪深300ETF_定投净值曲线.html:peSignal/simulate",
+      "sourceFileSha256": "2935c8d9456685bf10b8c83c85ac6663efe9c1bd6da1a7c93da7f67487d4a5de",
+      "adaptations": [
+        "Parse only strict BASE/PE JSON from verified immutable archives; never evaluate the original JavaScript.",
+        "Preserve prior-observation PE ranking, trailing calendar-year windows, minimum 120 observations, month-N/end purchase dates, VWAP adjustment, fees and pool interest.",
+        "Correct unconstrained mode to use actual multiplier deposits without negative-cash borrowing; different cashflows cannot be ranked by terminal wealth.",
+        "Correct flow-neutral unit NAV by valuing old holdings at the un-slipped adjusted VWAP before issuing account units; do not dilute price jumps with new deposits.",
+        "Reuse the existing dca_engine XIRR solver and its documented bounds; report null for unavailable solutions.",
+        "Expose a native read-only replay with source/calculation fingerprints and explicit non-PIT status, not a guarded request or persisted result asset."
+      ],
+      "sourcePolicy": "read_only_archive_bytes_no_old_script_execution_no_fetch"
     }
   ]
 }

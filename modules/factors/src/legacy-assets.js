@@ -119,6 +119,17 @@ export async function verifyLegacyArchive(archiveRoot, id) {
   return { archiveId: id, status: 'all_archived_bytes_verified', files: manifest.assets.length, records: manifest.records.length };
 }
 
+export async function readLegacyDcaSource(archiveRoot, id) {
+  const manifest = await readLegacyArchive(archiveRoot, id);
+  const asset = manifest.assets.find(a => a.sourcePath === 'src/沪深300ETF_定投净值曲线.html');
+  if (!asset) throw new Error('legacy_dca_archive_source_missing');
+  const versionRoot = path.join(archiveRoot, 'versions', id);
+  const bytes = await sourceBytes(versionRoot, asset.storagePath);
+  if (bytes.length !== asset.bytes || hash(bytes) !== asset.sha256) throw new Error('legacy_archive_integrity_failed');
+  return { storageRef: path.join(versionRoot, asset.storagePath), archiveId: id, assetId: asset.assetId,
+    sha256: asset.sha256, bytes: asset.bytes, sourcePath: asset.sourcePath, verification: 'archived_html_bytes_sha256_verified_not_executed' };
+}
+
 export async function captureLegacyArchive({ sourceRoot, archiveRoot }) {
   sourceRoot = path.resolve(sourceRoot); archiveRoot = path.resolve(archiveRoot);
   if (await realpath(sourceRoot) !== sourceRoot) throw new Error('legacy_symlink_not_allowed');

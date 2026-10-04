@@ -1,6 +1,6 @@
 {
   "name": "investment-workbench-01",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node apps/api/server.js",
     "factor:backtest": "node scripts/factor-backtest.js",
+    "factor:acceptance": "node scripts/factor-acceptance.js",
     "test": "node --test",
     "test:portable": "node --test tests/fund-maintenance.test.js tests/pinned-python.test.js",
     "check": "node scripts/check.js",

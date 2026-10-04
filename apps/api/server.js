@@ -10,7 +10,7 @@ import { coreContract } from '../../packages/contracts/core.js';
 import { commonFactorLibrary, factorArtifactCandidates, factorDataAssets, factorDefinitionCandidates, factorExperimentContract, factorLabCapabilityMap, factorResultViewSpecs, factorSnapshotCandidates, factorStrategyTemplates, factorTimingDefinitions } from '../../packages/contracts/factors.js';
 import { createFrozenSnapshotStore, freezeBindings, frozenSnapshotIdValid } from '../../modules/factors/src/frozen-snapshots.js';
 import { executePinnedPython } from '../../modules/factors/src/pinned-python.js';
-import { listLegacyArchives, queryLegacyRecords, readLegacyArchive } from '../../modules/factors/src/legacy-assets.js';
+import { listLegacyArchives, queryLegacyRecords, readLegacyArchive, readLegacyDcaSource } from '../../modules/factors/src/legacy-assets.js';
 import { acknowledgementsValid, backtestSpecs, bytesHash, fingerprint, workflowPolicy, workflowResultAudit, workflowVersion } from '../../modules/factors/src/backtest-tools.js';
 
 const root = fileURLToPath(new URL('../web/', import.meta.url));
@@ -70,6 +70,32 @@ async function customConfigCheck(item, configs) {
   const recorded = configs.items.some(c => { const p = c.strategySettings?.factorProgram; return c.strategyTemplateId === 'strategy.custom_industry_expression' && p?.factorFamilyId === program.factorFamilyId && p.revision === program.revision && p.executionSha256 === program.executionSha256; });
   if (!current && !recorded) throw Object.assign(new Error('custom_program_revision_not_registered'), { status: 422 });
   await expressionPython('preflight', item);
+}
+async function legacyDcaApi(url, { method, body, json }) {
+  try {
+    const options = url.pathname.endsWith('/options');
+    if (!(options ? ['GET','HEAD'].includes(method) : method === 'POST')) return json(405, {error:'method_not_allowed'});
+    const parsed = options ? {value:{}} : parseJsonBody(body);
+    if (parsed.error) return json(400, parsed);
+    if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) return json(422,{error:'legacy_dca_object_required'});
+    if (!options && (Object.keys(parsed.value).some(key => !['archiveId','sourceSha256','parameters'].includes(key)) || !parsed.value.archiveId || !parsed.value.sourceSha256)) return json(422,{error:'legacy_dca_version_bound_parameters_required'});
+    const archives = await listLegacyArchives(factorLegacyArchiveRoot);
+    const archiveId = options ? (url.searchParams.get('archiveId') || archives.items[0]?.archiveId) : parsed.value.archiveId;
+    if (!archiveId) return json(404,{error:'legacy_dca_archive_not_found'});
+    const source = await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
+    if (!options && parsed.value.sourceSha256 !== source.sha256) return json(409,{error:'legacy_dca_source_version_mismatch'});
+    const directory = path.join(projectRoot, 'modules/factors/src');
+    const {stdout,sourceHashes} = await executePinnedPython(path.join(directory,'legacy_dca_engine.py'), [source.storageRef,source.sha256,options?'options':'preview',JSON.stringify(parsed.value.parameters || {})],
+      {timeout:30000,modules:['legacy_html_literals','dca_engine'].map(name=>({name,path:path.join(directory,`${name}.py`)}))});
+    const run = JSON.parse(stdout);
+    if (run.error) return json(run.error.includes('integrity')?409:422,{error:run.error});
+    await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
+    const {storageRef,...sourceVersion} = source;
+    return json(200,{...run,sourceVersion,calculationSources:sourceHashes,
+      temporalEligibility:{status:'not_point_in_time_verified',reason:'估值观测日滞后不证明披露可得时间；当日VWAP与复权份额只作旧页面假设模拟。'},
+      policy:'archived_native_replay_preview_no_config_request_result_write_no_fetch',
+      ...(options?{archives:archives.items.filter(item=>item.assetCount>=13).map(item=>({archiveId:item.archiveId,createdAt:item.createdAt}))}:{})});
+  } catch(error) {return json(error.code==='ENOENT'?404:422,{error:error.code==='ENOENT'?'legacy_dca_archive_not_found':error.message});}
 }
 async function customExpressionApi(url, { method, body, json, snapshotStore }) {
   try {
@@ -142,6 +168,7 @@ const assets = new Map([
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/fund-screen-state.js', ['fund-screen-state.js', 'text/javascript; charset=utf-8']],
   ['/industry-state.js', ['industry-state.js', 'text/javascript; charset=utf-8']],
+  ['/factor-analysis.js', ['factor-analysis.js', 'text/javascript; charset=utf-8']],
   ['/module-loader.js', ['module-loader.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
 ]);
@@ -173,7 +200,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
   const factorRunRequestWrite = url.pathname === '/api/modules/factors/v1/run-requests';
   const factorRunExecuteWrite = /^\/api\/modules\/factors\/v1\/run-requests\/[^/]+\/execute$/.test(url.pathname);
   const factorSnapshotWrite = url.pathname === '/api/modules/factors/v1/snapshots/frozen' || /^\/api\/modules\/factors\/v1\/snapshots\/frozen\/[^/]+\/verify$/.test(url.pathname);
-  const expressionWrite = ['/api/modules/factors/v1/custom-expression/validate','/api/modules/factors/v1/custom-expression/preview'].includes(url.pathname);
+  const expressionWrite = ['/api/modules/factors/v1/custom-expression/validate','/api/modules/factors/v1/custom-expression/preview','/api/modules/factors/v1/legacy-dca/preview'].includes(url.pathname);
   const workflowWrite = url.pathname === '/api/modules/factors/v1/backtest-tools/run';
   if (method !== 'GET' && method !== 'HEAD' && !((factorLibraryWrite || factorConfigWrite) && ['POST', 'PUT'].includes(method)) && !(factorRunRequestWrite && method === 'POST') && !(factorRunExecuteWrite && method === 'POST') && !(factorSnapshotWrite && method === 'POST') && !(expressionWrite && method === 'POST') && !(workflowWrite && method === 'POST')) {
     return json(405, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' });
@@ -188,7 +215,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.3', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.4', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -209,6 +236,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
     if (url.pathname === '/api/modules/factors/v1/experiment-comparison') return factorExperimentComparison(json);
     if (url.pathname === '/api/modules/factors/v1/product-state') return factorProductState(json);
     if (url.pathname === '/api/modules/factors/v1/library') return factorLibrary(json);
+    if (['options','preview'].some(mode => url.pathname === `/api/modules/factors/v1/legacy-dca/${mode}`)) return legacyDcaApi(url, {method,body,json});
     if (['options','validate','preview'].some(mode => url.pathname === `/api/modules/factors/v1/custom-expression/${mode}`)) return customExpressionApi(url, {method,body,json,snapshotStore});
     if (url.pathname === '/api/modules/factors/v1/library/submissions') return factorLibrarySubmissions({ method, body, json });
     if (url.pathname.startsWith('/api/modules/factors/v1/library/submissions/')) return factorLibrarySubmission(url, { method, body, json });
@@ -629,6 +657,8 @@ async function factorVisualLab(json) {
       soloExcess: item.solo_excess,
       marginal: item.marginal,
       turnover: loo.turnover[item.key],
+      ruleDegree: ({ value: 1, mom: 1, prosper: .55, crowd: .35 })[item.key] ?? null,
+      ruleDegreePolicy: 'legacy_factor_registry_qualitative_annotation_not_measured',
     })),
     labComps: {
       variants: comps.b_variants,
@@ -658,7 +688,7 @@ async function factorExperimentComparison(json) {
       group,
       activeMonthCount: Array.isArray(comps.b_active) ? comps.b_active.filter(Boolean).length : null,
       metrics: comparisonMetrics(dates, values),
-      series: sampleSeries(dates, values, 160),
+      series: sampleSeries(dates, values, dates.length),
       weights: (comps.b_variants || []).find(item => `B_${item.key}` === key)?.weights || null,
     };
   });
@@ -849,15 +879,14 @@ function sampleSeries(dates, values, maxPoints = 180) {
   if (!Array.isArray(dates) || !Array.isArray(values)) return [];
   const n = Math.min(dates.length, values.length);
   const step = Math.max(1, Math.ceil(n / maxPoints));
-  const rows = [];
-  for (let i = 0; i < n; i += step) {
-    const value = values[i];
-    if (value == null || Number.isNaN(Number(value))) continue;
-    rows.push({ date: dates[i], value: Number(value) });
-  }
-  if (n > 0 && rows.at(-1)?.date !== dates[n - 1]) {
-    const value = values[n - 1];
-    if (value != null && !Number.isNaN(Number(value))) rows.push({ date: dates[n - 1], value: Number(value) });
+  const rows = [], valid = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value));
+  const indices = []; for (let i = 0; i < n; i += step) indices.push(i);
+  if (n && indices.at(-1) !== n-1) indices.push(n-1);
+  let previous = -1;
+  for (const i of indices) {
+    // Keep a gap marker even when the display stride would skip missing rows.
+    for (let j = previous+1; j < i; j++) if (!valid(values[j])) { rows.push({date:dates[j],value:null}); break; }
+    rows.push({date:dates[i],value:valid(values[i]) ? Number(values[i]) : null}); previous=i;
   }
   return rows;
 }

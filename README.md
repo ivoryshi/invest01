@@ -1,8 +1,10 @@
 # 投研工作台01
 
-本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前版本 **v0.5.3 / 因子迁移 V0.20**。源码发布在 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，不是已经部署的在线服务。
+本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前本地版本 **v0.5.4 / 因子迁移 V0.21**。源码发布使用 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，本版远端状态以发布回执为准，不是已经部署的在线服务。
 
 **因子实验室可执行，但完整迁移尚未关闭。** 回测工具和项目内Skill首版已接通只读预检、明确确认执行、结果复用与结构审计；历史基金选基/PIT、真实成交及旧页面逐项验收仍有剩余。冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
+
+本批补齐图表日期/区间/框选/缩放、账户收益/回撤、共同窗比较、全部结果查询、实际子因子槽位权重与导出，以及510300归档PE择时复算（分档倍数/现金池/月内买入日/均线与买停标记）。归档复算是只读预览，可下载/载入参数文件，不进入正式配置/请求/结果库或绕过guarded工具。真实浏览器完整操作仍未验收，统一证据和剩余项见[迁移验收](docs/wiki/FACTOR-ACCEPTANCE.md)。
 
 ## 当前能力
 
@@ -78,11 +80,14 @@ npm run factor:backtest -- preflight --config-id config.your_saved_config --port
 npm run check
 npm run test:portable
 npm test
+npm run factor:acceptance
 npm run build
 npm run test:observatory
 ```
 
 完整 `npm test` 包含依赖本机授权数据的集成测试；无数据环境不承诺通过。测试期间不要运行真实实验或并发执行另一轮集成测试，因为部分API测试会暂存/恢复本机运行库。默认构建只更新观察台，不运行日报、抓取或回测。自动测试与真实浏览器操作/视觉验收分别记录。
+
+`factor:acceptance`需要本机数据库/运行文件/原件档案，只发只读查询并核验归档，报告写入本机`var/factors/migration-acceptance/latest.json`、不上传Git；通过状态是`readonly_baseline_passed_acceptance_review_required`，不是整体验收通过。不要与真实实验或全API回归并发运行。
 
 ## 文档导航
 
@@ -93,6 +98,7 @@ npm run test:observatory
 - [计算口径](docs/wiki/FACTOR-CALCULATIONS.md)：得分、现金流、收益、归因和误差。
 - [开发验收](docs/wiki/DEVELOPMENT.md)、[运维发布](docs/wiki/OPERATIONS.md)、[当前架构](docs/wiki/ARCHITECTURE.md)。
 - [迁移清单](docs/wiki/FACTOR-MIGRATION.md)、[短状态](docs/wiki/STATUS-SHORT.md)、[任务](docs/wiki/TASKS.md)、[Wiki](docs/wiki/README.md)。
+- [迁移验收矩阵](docs/wiki/FACTOR-ACCEPTANCE.md)：旧功能对应、计算差异、真实操作证据与待收口项。
 - [贡献规范](CONTRIBUTING.md)、[安全边界](SECURITY.md)、[来源与许可](THIRD_PARTY_NOTICES.md)、[执行规范](AGENTS.md)。
 
 ## 发布边界

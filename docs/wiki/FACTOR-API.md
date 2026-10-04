@@ -17,6 +17,8 @@
 | /custom-expression/options | GET | 字段/函数及已注册程序 |
 | /custom-expression/validate | POST | executionSpec校验，不保存 |
 | /custom-expression/preview | POST | config同日定位试算，不生成结果 |
+| /legacy-dca/options?archiveId= | GET | 已归档510300数据覆盖、默认参数、源SHA与版本选择；不执行原HTML |
+| /legacy-dca/preview | POST | 固定archiveId/sourceSha256与完整parameters只读复算；不写配置/请求/结果 |
 | /industry-engine/options、/three-bucket-engine/options | GET | 支持参数和固定定义 |
 | /backtest-engine、/execution-plan | GET | 引擎/就绪检查，不执行 |
 | /backtest-tools、/backtest-tools/skill | GET | 五类受保护历史模拟目录/项目Skill正文 |
@@ -47,6 +49,20 @@
 配置包括configId、title、strategyTemplateId、snapshotId、universe、factorFamilyIds、factorWeights、benchmarkId、portfolioRule、rebalanceCalendar、costModel、constraints、comparisonLimits、strategySettings/transactionSettings。应从当前templates或原生表单获取完整字段，不拼凑只含ID的请求。某些通用草案可保存但不能执行，执行阶段严格拒绝不支持规则。
 
 自建factorProgram必须引用已注册或已保存历史revision和executionSha256；不是客户端任意填入的“证明”。修改定义不改变配置中的公式副本。基金篮子需先profile读取sourceVersions；筛选也需读取源SHA与严格comparisonGroup。
+
+原始行业可提交`strategySettings.slotWeights=[{familyId,field,weight},...]`，须完整对应选中族的全部槽位，数值0—100且每族至少一项正权重；0禁用、类内归一。未传沿用原权重，重复/缺失/未知项拒绝。自建行业使用`factorProgram`节点权重，拒绝原始`slotWeights`，不能静默忽略。
+
+## 归档510300复算
+
+先GET options取得选定原件的`sourceVersion.archiveId/sha256`与完整`defaults`，再POST preview：
+
+```json
+{"archiveId":"64位实际归档ID","sourceSha256":"options返回的实际原件SHA","parameters":{"amount":10000,"fee":0.0001,"slippage":0.0005,"nth":1,"startMonth":"2012-06","endMonth":"2026-07","timingEnabled":true,"peKey":"TTM","years":5,"mode":"pool","cashRate":0.02,"ladder":[{"hi":10,"multiple":2},{"hi":20,"multiple":1.75},{"hi":40,"multiple":1.5},{"hi":60,"multiple":1},{"hi":80,"multiple":0.6},{"hi":90,"multiple":0.3},{"hi":100,"multiple":0}]}}
+```
+
+示例ID/SHA是占位，不可直接执行。`nth`只允许1/2/3/5/10/15/-1；PE口径TTM/LYR/MED，回看整数1—20年；最多12档严格递增并终止100，倍数0—10。参数集合精确匹配，来源缺失404、SHA变化409、不支持/不合法422。归档源每次核验字节，解析严格JSON而非运行JavaScript；计算源码固定捕获并返回主/依赖SHA。
+
+返回完整`accountLedger/trades/cashFlows/metrics/parameters/sourceVersion/calculationSources`及`not_point_in_time_verified`；无`requestId/artifactId`，不进入正式资产库、不自动抓取/冻结/保存。参数文件可下载和重新载入页面，后端仍完整校验；导出不意味着已经保存为正式实验。此预览不属于backtest-tools五类冻结模拟，不通过它绕过guarded研究执行。费用、现金流和旧逻辑修正见[验收计算差异](FACTOR-ACCEPTANCE.md)。
 
 基金冻结POST /snapshots/frozen正文为baseSnapshotId="snapshot.fund_warehouse.nav_db.current"、可选title、必填selection。selection精确包含codes数组、benchmarkId、profile返回的sourceVersions，凭证按universe_master、请求codes顺序、benchmark顺序原样传入。不得填客户端自造SHA。返回snapshotId后显式写入配置再保存，不自动保存或执行。GET返回freezeOptions.selectionRequired=true；通用文件冻结表单不代替基金选定源绑定。冻结profile/execute要求同一篮子与基准（篮子顺序可不同），变化需另建快照。
 
