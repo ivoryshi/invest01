@@ -286,6 +286,9 @@ test('local API and public asset boundaries', async t => {
     assert.equal(dataLayer.updateJobs.find(x => x.jobId === 'job.factor_data.monthly_update_script').status, monthlyAsset.exists ? 'ready_manual' : 'documented');
     assert.ok(dataLayer.legacyExports.some(x => x.title === 'report.json' && x.migrationStatus === 'used_by_native_factor_lab'));
     assert.equal(dataLayer.computePolicy, 'metadata_and_update_job_registry_no_fetch');
+    assert.equal(dataLayer.databaseMaintenance.status, 'offline_manual_tools_available');
+    assert.equal(dataLayer.databaseMaintenance.policy, 'explicit_offline_no_fetch_no_schedule_restore_to_new_only');
+    assert.match(dataLayer.databaseMaintenance.restoreCommand, /--output <new-file>/);
   });
   await t.test('broad DCA execution recomputes from parquet and rejects unsupported policies', async () => {
     const paths = [factorConfigsPath, factorRunRequestsPath, factorResultArtifactsPath];

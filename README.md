@@ -1,50 +1,86 @@
 # 投研工作台01
 
-独立新建的投研服务工作台。创建日期：2026-09-15。
+本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前版本 **v0.5.1 / 因子迁移 V0.18**。源码发布在 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，不是已经部署的在线服务。
 
-本目录是新项目唯一根目录，代码、Wiki、测试、配置与版本记录均在这里维护。当前已接入观察台、研究生产只读索引、第一版核心契约，以及部分因子实验室配置、图表、原始行业月度TopN、A/B/C三档定投与择时、冻结版本执行、宽基定投、基金同组筛选、独立SQLite历史净值/手动基金篮子定投，以及行业自建公式的定义编辑/版本绑定/定位试算/真实回测闭环；因子完整迁移仍未完成，见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。日报归档与早晚报生产暂停，仅保留历史入口。其他模块、实时数据和统一后台待接入。
+**因子实验室可执行，但完整迁移尚未关闭。** 历史基金选基/PIT、真实成交、动态基金实验冻结和旧页面逐项验收仍有剩余；基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
 
-## 产品范围
+## 当前能力
 
-- 投研观察台：指数、风格、量价、基本面、价值和动量，覆盖 A 股、港股、美股及日本参照系。
-- 投研工具：研究任务、公司分析、对比和证据核验。
-- 因子实验室：因子定义、数据版本、实验和可比性检查。
-- 知识与证据库：原始资料、检索、引用和版本追踪。
-- 模拟组合与复盘：持仓观察、研究判断和结果回看。
-- Lance 投顾助手：画像、内容节点、Mission 与服务流程。
-- 早晚报归档：暂停生产与默认回归，仅保留历史快照入口。
+| 模块 | 已落地 | 边界 |
+|---|---|---|
+| 投研观察台 | 原生观察面板、来源与配置查询 | 部分明确标记为示例；不是实时行情服务 |
+| 研究生产 | Skill、流程和旧产出只读索引 | 不调用模型或执行旧生产任务 |
+| 因子实验室 | 定义/子因子编辑、配置、执行请求、结果/账本、图表和历史查询 | 定义入库不等于可计算；不支持的策略明确拒绝 |
+| 基金数据层 | 新工作台SQLite、离线增量导入、查询、手动备份/核验/新文件恢复 | 不自动抓取、调度、更新基准或切换数据库 |
+| 日报 | 保留历史入口 | 日报归档及早晚报生产暂停，不参与默认生产 |
+| 知识库、模拟复盘、Lance | 工作区登记 | 核心业务仍待迁入，不是完整可用模块 |
 
-观察链路保留宏观 → 行业及上中下游 → 上市公司 → 现金流与债务 → 市场定价，支持 2027—2028 年中美信用周期叙事，以及中国消费复苏、美国通胀下行的证据与反证监测。
+因子已支持原始行业月度TopN、自建行业白名单公式、宽基月/周/双周定投、A/B/C三档月度定投、基金同口径横截面筛选、SQLite手动固定基金篮子历史定投。行业/自建行业支持真实敏感度重跑及代理风险模型；行业和现金流策略分别有账本超额归因。代理模型不是因果Alpha或独立Smart Beta，筛选不是历史基金回测。
 
-## 入口
+## 快速启动
 
-- [项目 Wiki](docs/wiki/README.md)
-- [短状态入口](docs/wiki/STATUS-SHORT.md)
-- [任务计划](docs/wiki/TASKS.md)
-- [执行规范](AGENTS.md)
-
-## 开发边界
-
-原始项目不修改。经后续确认，本批已复制观察台代码和明确的日报归档；不导入旧Git历史、数据库或密钥。后续复用采用经确认范围内的直接复制，并记录来源、版本与适配差异。
-
-## 本地运行
-
-当前首版v0.5.0（因子V0.17，缓存v0.5.16）已上传[GitHub发布分支](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)。发布范围、验证与未完成项见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。本机数据与运行状态不随源码发布，新的机器必须另行提供授权数据；现有绝对路径绑定尚未跨机器配置化。本机本轮功能验证入口为 http://127.0.0.1:4321/#factors ，默认启动端口仍4311。未部署线上。
-
-`var/`仅保留本机文件：实验定义/配置/请求/结果、自动注册表、SQLite、冻结和旧实验原件均忽略Git。文件仍在本机，未删除。服务读取不存在的库为空，测试首次创建空运行库；`npm run registry:snapshot`手动生成注册表。完整数据回归需要本机现成数据和Python环境，不是无数据的新机器也能执行完整回测。
-
-使用 Node.js 24.14.0（本批验证版本），无外部依赖，无需 npm install。
-
-因子数据查询、宽基定投与基金筛选另外使用Python及NumPy、pandas、PyArrow，当前验证版本登记在[因子依赖](modules/factors/requirements.txt)。本机已有这些依赖；本轮未安装或替换软件。因子执行由用户触发，使用现成数据，不触发抓取更新。
-
-基金历史净值已使用新工作台`var/factors/fund-history.sqlite`。`npm run import:fund-history`显式离线导入原有CSV及已存基准，可重复执行、记录异常且跳过未变化内容；旧文件不改。运行时只读数据库，不自动读取更新后的CSV。基准更新脚本后续再接，回测限于已有共同区间；数据库不上传Git、不等同于备份。
+Node.js支持范围见 [package.json](package.json)，当前验证基线为 **24.14.0**，也声明支持22.23.1以上的22.x。Node侧零第三方包，无需 `npm install`。
 
 ```sh
+git clone --branch release/factor-migration-v1 https://github.com/ivoryshi/invest01.git
+cd invest01
 npm run check
-npm test
+npm run test:portable
 npm start
 ```
 
-启动成功后打开 http://127.0.0.1:4311 ，因子页为`#factors`。可通过 PORT 环境变量更换端口。服务固定监听本机回环地址；终端 Ctrl+C 停止。七个入口支持URL哈希导航；观察台与部分因子能力原生接入，研究生产为只读索引，日报归档为暂停入口，其他模块待迁入。观察台保留原明确标识的示例演示。2026-10-03用户已在本机终端恢复服务并确认页面可打开；修改后端代码后需重启该服务，新面板完整浏览器验收仍待补。整体样式与架构按用户要求后置，不因页面可达而标为验收完成。
+`test:portable`需要Python 3，仅测试隔离数据库维护与源码指纹，不需要原始数据或NumPy。打开 [工作台](http://127.0.0.1:4311/) 或 [因子实验室](http://127.0.0.1:4311/#factors)。服务固定监听本机回环地址，没有认证，不应公开到互联网。Ctrl+C停止；修改后端代码后重启。端口占用可用：
 
-[A01接入说明](docs/wiki/A01-观察台与日报接入.md)
+```sh
+PORT=4322 npm start
+```
+
+没有私有数据的新机器可以启动页面和部分元数据接口，但不能直接执行完整回测；数据缺失不应被理解为策略无效或零收益。`/api/health`只确认进程健康，`dataConnected=false`不等于所有本地数据均未接入。
+
+## Python 与数据准备
+
+回测/CSV与Parquet查询依赖Python、NumPy、pandas、PyArrow，验证版本见 [requirements.txt](modules/factors/requirements.txt)。备份和CSV导入使用标准库。新机器可自行在虚拟环境准备依赖；本次交付未自动安装或替换环境：
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r modules/factors/requirements.txt
+```
+
+启动Node服务前激活环境，执行器通过PATH里的 `python3`调用。源码不包含授权行情、基金历史数据库、实验配置/结果、冻结副本或旧实验原件。行业/宽表/研究索引仍有本机绝对路径，尚未全部跨机器配置化；请先阅读[数据准备与维护](docs/wiki/FACTOR-DATA.md)，不要以新造数据替代缺失历史。
+
+现成净值CSV离线转库示例：
+
+```sh
+npm run import:fund-history -- --raw-root /absolute/path/to/fund-warehouse/raw
+npm run import:fund-history -- --nav-codes 000001 000002 --skip-benchmarks
+npm run backup:fund-history -- create
+```
+
+这些命令只在明确触发时执行，不重新抓取历史。增量导入以源内容SHA跳过不变数据，更新后旧配置需重新读取源版本。备份是整库复制，先检查磁盘容量；恢复只写新文件，不自动替换活动库。具体参数、返回码和恢复演练见[数据说明](docs/wiki/FACTOR-DATA.md)。
+
+## 开发与验证
+
+```sh
+npm run check
+npm run test:portable
+npm test
+npm run build
+npm run test:observatory
+```
+
+完整 `npm test` 包含依赖本机授权数据的集成测试；无数据环境不承诺通过。测试期间不要运行真实实验或并发执行另一轮集成测试，因为部分API测试会暂存/恢复本机运行库。默认构建只更新观察台，不运行日报、抓取或回测。自动测试与真实浏览器操作/视觉验收分别记录。
+
+## 文档导航
+
+- [因子实验室说明](modules/factors/README.md)：执行器、公式、结果与边界。
+- [数据准备与维护](docs/wiki/FACTOR-DATA.md)：目录、CSV口径、增量导入、冻结、备份恢复。
+- [因子API](docs/wiki/FACTOR-API.md)：读写端点、执行步骤与错误处理。
+- [计算口径](docs/wiki/FACTOR-CALCULATIONS.md)：得分、现金流、收益、归因和误差。
+- [开发验收](docs/wiki/DEVELOPMENT.md)、[运维发布](docs/wiki/OPERATIONS.md)、[当前架构](docs/wiki/ARCHITECTURE.md)。
+- [迁移清单](docs/wiki/FACTOR-MIGRATION.md)、[短状态](docs/wiki/STATUS-SHORT.md)、[任务](docs/wiki/TASKS.md)、[Wiki](docs/wiki/README.md)。
+- [贡献规范](CONTRIBUTING.md)、[安全边界](SECURITY.md)、[来源与许可](THIRD_PARTY_NOTICES.md)、[执行规范](AGENTS.md)。
+
+## 发布边界
+
+只同步源码、测试和文档，`var/`仅保留占位文件。本机旧main包含生成缓存历史，因此新版本继续干净release分支，**不合并旧main，不推送其历史**。没有自动生产部署、认证、后台任务队列或外部灾备。旧项目只读，迁移来源与适配记录见Wiki及来源清单。尚未指定通用开源许可证，公开可见不等于授权再分发数据或所有来源资产。

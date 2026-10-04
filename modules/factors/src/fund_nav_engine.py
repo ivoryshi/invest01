@@ -12,7 +12,7 @@ from dca_engine import cashflow_attribution, schedule, xirr
 import fund_history_store as store
 
 VERSION = 'fund-nav-sqlite-fixed-dca-v1'
-BENCHMARKS = ['CSI300', 'CSI500', 'CSI800', 'CSI1000', 'CSI2000', 'CSIA500', 'CSI100', 'CSIALL', 'SSE50', 'STAR50', 'STAR100', 'CHINEXT', 'CHINEXT50', 'DIVIDEND', 'SZ100', 'BONDALL', 'BONDGOV', 'BONDCORP', 'CONVBOND']
+BENCHMARKS = store.BENCHMARKS
 DEFAULTS = {'startDate': '2025-01-02', 'endDate': '2026-07-30', 'amount': 10000, 'frequency': 'monthly', 'calendarPolicy': 'common_observed_dates', 'maxGapDays': 14, 'benchmarkPolicy': 'same_flow_gross_index'}
 
 

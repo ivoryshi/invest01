@@ -1,23 +1,17 @@
-# Wiki
+# 项目Wiki
 
-状态：N01 本地工程骨架 v0.1.0；业务服务及数据接入待实施。
+当前v0.5.1 / 因子迁移V0.18。源码已建立干净发布分支，观察台/研究只读索引/因子执行主线已接入；迁移仍有剩余。日报暂停，基准更新、V2全局样式/技术架构后置。旧批次方案保留为历史，不替代当前状态。
 
-- [任务计划](TASKS.md)
-- [短状态入口](STATUS-SHORT.md)
-- [架构基线](ARCHITECTURE.md)
-- [开发与验收](DEVELOPMENT.md)
-- [运维与版本管理](OPERATIONS.md)
-- [变更记录](CHANGELOG.md)
-- [批准记录](records/APPROVALS.md)
-- [审查记录](records/REVIEWS.md)
-- [每日进展与用量](records/DAILY.md)
+## 当前入口
 
-文档随功能补齐，当前不代表完整产品 Wiki 已完成。
+- [短状态](STATUS-SHORT.md)、[迁移清单](FACTOR-MIGRATION.md)、[任务与历史计划](TASKS.md)
+- [因子数据维护](FACTOR-DATA.md)、[因子API](FACTOR-API.md)、[计算口径](FACTOR-CALCULATIONS.md)
+- [当前架构](ARCHITECTURE.md)、[开发验收](DEVELOPMENT.md)、[运维发布](OPERATIONS.md)
+- [变更记录](CHANGELOG.md)、[批准](records/APPROVALS.md)、[独立审查](records/REVIEWS.md)、[每日与Git状态](records/DAILY.md)
+- [根README](../../README.md)、[因子模块](../../modules/factors/README.md)、[贡献](../../CONTRIBUTING.md)、[安全](../../SECURITY.md)、[来源许可](../../THIRD_PARTY_NOTICES.md)
 
-## 当前评审入口
+## 历史方案与来源
 
-[完整产品与前中后台架构方案 V0.2](方案评审/完整产品与技术架构方案-V0.2.md) · [源产品盘点](方案评审/源产品盘点.md) · [复用验收矩阵](方案评审/复用验收矩阵.csv)。
+[完整产品架构V0.2](方案评审/完整产品与技术架构方案-V0.2.md)、[源产品盘点](方案评审/源产品盘点.md)、[复用矩阵](方案评审/复用验收矩阵.csv)保留原评审时状态；架构方向后续已确认，实施结果以新批准/迁移记录为准。[A01说明](A01-观察台与日报接入.md)记录早期复制接入。
 
-2026-09-16：上述方案待用户确认，覆盖Lance与所有原产品完整复用；N01仅为运行骨架。方案未批准前不继续按旧N02—N07直接实施。
-
-[A01观察台与日报接入](A01-观察台与日报接入.md)：架构方向已确认，首批实施进展独立记录；方案正文仍保留评审时版本。
+文档说明已实现/待实现/已验证边界，不以Git上传替代全产品验收。

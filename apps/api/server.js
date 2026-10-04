@@ -175,7 +175,7 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.0', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.1', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -1076,6 +1076,15 @@ async function factorDataLayer(json) {
     snapshots,
     updateJobs,
     legacyExports,
+    databaseMaintenance: {
+      status: 'offline_manual_tools_available', databaseAssetId: 'factors.fund_warehouse.nav_db',
+      importCommand: 'npm run import:fund-history -- --nav-codes <codes> --skip-benchmarks',
+      backupCommand: 'npm run backup:fund-history -- create',
+      verifyCommand: 'npm run backup:fund-history -- verify <pack>',
+      restoreCommand: 'npm run backup:fund-history -- restore <pack> --output <new-file>',
+      policy: 'explicit_offline_no_fetch_no_schedule_restore_to_new_only',
+      notes: '整库备份包含已提交WAL；核验SHA/完整性/源版本。恢复不自动换库，不等同动态实验冻结或已建立外部备份。',
+    },
     notes: [
       '历史宽表、SQLite、parquet面板和月度更新脚本已纳入因子实验室数据层管理。',
       '本接口只登记数据资产、快照候选和更新任务，不读取大宽表正文，不触发联网抓取。',

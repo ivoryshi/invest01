@@ -11,6 +11,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 1
+BENCHMARKS = ['CSI300', 'CSI500', 'CSI800', 'CSI1000', 'CSI2000', 'CSIA500', 'CSI100', 'CSIALL', 'SSE50', 'STAR50', 'STAR100', 'CHINEXT', 'CHINEXT50', 'DIVIDEND', 'SZ100', 'BONDALL', 'BONDGOV', 'BONDCORP', 'CONVBOND']
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS store_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS shares(code TEXT PRIMARY KEY, name TEXT NOT NULL, metadata TEXT NOT NULL);
@@ -139,7 +140,15 @@ def ingest_file(db, path, source_id, kind, code):
     return 'imported'
 
 
-def import_csvs(root, database, benchmark_ids, progress=None):
+def import_csvs(root, database, benchmark_ids, progress=None, nav_codes=None, require_benchmarks=False):
+    if nav_codes is not None and (not isinstance(nav_codes, (list, tuple)) or
+            any(not isinstance(code, str) or not re.fullmatch(r'[0-9]{6}', code) for code in nav_codes) or
+            len(set(nav_codes)) != len(nav_codes)):
+        raise ValueError('fund_history_invalid_nav_selection')
+    if (not isinstance(benchmark_ids, (list, tuple)) or
+            any(not isinstance(key, str) or not re.fullmatch(r'[A-Za-z0-9_]+', key) for key in benchmark_ids) or
+            len(set(benchmark_ids)) != len(benchmark_ids)):
+        raise ValueError('fund_history_invalid_benchmark_selection')
     root, database = Path(root), Path(database)
     if database.is_symlink() or root.is_symlink() or any((root/name).is_symlink() for name in ['nav', 'bench']):
         raise ValueError('fund_history_symlink_not_allowed')
@@ -165,8 +174,11 @@ def import_csvs(root, database, benchmark_ids, progress=None):
                 db.execute('INSERT INTO import_errors VALUES(?,?,?)', (run_id, 'universe_master', str(error)))
                 db.execute("UPDATE import_runs SET status='failed', finished_at=?, rejected=1 WHERE run_id=?", (now(), run_id))
             raise ValueError('fund_history_universe_import_failed_' + str(error)) from error
-        files = [(file, 'nav.'+file.stem, 'nav', file.stem) for file in sorted((root/'nav').glob('*.csv')) if re.fullmatch(r'[0-9]{6}', file.stem)]
-        files += [(root/'bench'/f'{key}.csv', 'benchmark.'+key, 'benchmark', key) for key in benchmark_ids if (root/'bench'/f'{key}.csv').exists()]
+        # Explicit selections include missing files so they are audited, never silently skipped.
+        nav_files = sorted((root/'nav').glob('*.csv')) if nav_codes is None else [root/'nav'/f'{code}.csv' for code in sorted(nav_codes)]
+        files = [(file, 'nav.'+file.stem, 'nav', file.stem) for file in nav_files if re.fullmatch(r'[0-9]{6}', file.stem)]
+        files += [(root/'bench'/f'{key}.csv', 'benchmark.'+key, 'benchmark', key) for key in benchmark_ids
+                  if require_benchmarks or (root/'bench'/f'{key}.csv').exists()]
         for index, (file, source_id, kind, code) in enumerate(files, 1):
             try:
                 counts[ingest_file(db, file, source_id, kind, code)] += 1

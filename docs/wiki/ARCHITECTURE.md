@@ -1,5 +1,17 @@
 # 架构基线
 
+## 当前实现 · v0.5.1
+
+本节是当前事实，下方N01/V0.2为历史方案。Node原生HTTP提供明确静态白名单及版本化API，浏览器ES Modules原生挂载，观察台模块用Shadow DOM隔离；不使用iframe或嵌套旧页面。API按观察台/研究/日报/因子命名空间划分，七入口中知识/组合/Lance核心仍待迁入，日报生产暂停。
+
+因子定义/配置/请求/结果保存在本机var JSON；显式执行请求捕获Python主/依赖源码字节和SHA，再只读已有数据执行，写入新的结果与审计。不是后台队列或多用户事务服务。行业/自建行业、宽基、三档和基金篮子执行器各有实际口径，候选登记和旧结果显示不等于已执行。
+
+基金历史使用新工作台SQLite，单源离线导入事务与只读计算事务；原CSV/fof.db只读。CSV/Parquet冻结和旧导出不可变档案按内容身份保存；整库备份通过SQLite在线备份，恢复新文件不自动换库，尚未接入动态基金实验冻结。
+
+PostgreSQL/对象存储/认证/后台workers仅为后续方向，没有安装或实现。现有绝对来源路径仍部分本机绑定；当前相对化的是工作台基金数据库，不能声称全项目已可无数据跨机器运行。完整接口/计算/数据边界见[API](FACTOR-API.md)、[计算](FACTOR-CALCULATIONS.md)、[数据](FACTOR-DATA.md)、[安全](../../SECURITY.md)。
+
+## 历史基线（保留原阶段说明）
+
 延续已讨论的模块化 API、研究任务执行器、Python 因子执行器、PostgreSQL 和对象存储方向。它们是目标架构，尚未安装或实现；新项目的具体工程依赖与落地顺序在 N01 确认。
 
 目录预留：apps/web 页面、apps/api 接口、workers/research 研究任务、workers/factors 因子任务、packages/contracts 公共契约、adapters 数据服务适配、tests 验证、docs/wiki 文档、var 本地运行产物。

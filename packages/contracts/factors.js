@@ -1,3 +1,7 @@
+import { fileURLToPath } from 'node:url';
+
+const workbenchRoot = fileURLToPath(new URL('../../', import.meta.url));
+
 export const factorExperimentContract = {
   schemaVersion: 1,
   apiVersion: 'v1',
@@ -140,8 +144,8 @@ export const factorExperimentContract = {
 
 export const factorDataAssets = [
   { assetId: 'factors.fund_warehouse.nav_db', module: 'factors', title: '基金历史净值 SQLite（新工作台）', assetType: 'sqlite_store',
-    storageRef: '/Users/samshi/Desktop/my codex/投研工作台01/var/factors/fund-history.sqlite', refreshMode: 'manual',
-    ownerProject: '/Users/samshi/Desktop/my codex/投研工作台01', asOfDate: null, hashPolicy: 'selected_import_source_sha_in_read_transaction',
+    storageRef: fileURLToPath(new URL('../../var/factors/fund-history.sqlite', import.meta.url)), refreshMode: 'manual',
+    ownerProject: workbenchRoot, asOfDate: null, hashPolicy: 'selected_import_source_sha_in_read_transaction',
     notes: '独立离线导入既有名录/净值/基准，记录源SHA和导入异常；查询与回测只读数据库。不是最新基金宽表，也不是外部备份。' },
   ...[['nav_history', '原始基金份额净值目录', 'nav'], ['nav_benchmarks', '基金历史基准指数目录', 'bench'], ['nav_universe', '基金份额名录', 'universe_master.csv']].map(([key, title, file]) => ({
     assetId: `factors.fund_warehouse.${key}`, module: 'factors', title,

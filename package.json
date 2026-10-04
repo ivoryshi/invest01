@@ -1,6 +1,6 @@
 {
   "name": "investment-workbench-01",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,12 +9,14 @@
   "scripts": {
     "start": "node apps/api/server.js",
     "test": "node --test",
+    "test:portable": "node --test tests/fund-maintenance.test.js tests/pinned-python.test.js",
     "check": "node scripts/check.js",
     "build": "python3 modules/observatory/src/build.py",
     "build:observatory": "python3 modules/observatory/src/build.py",
     "build:daily": "node modules/daily/src/build.js",
     "registry:snapshot": "node scripts/snapshot-registry.js",
     "import:fund-history": "python3 -B scripts/import-fund-history.py",
+    "backup:fund-history": "python3 -B scripts/fund-history-backup.py",
     "archive:factor-legacy": "node scripts/archive-factor-legacy.js",
     "start:observatory": "node scripts/serve-module.js observatory",
     "start:daily": "node scripts/serve-module.js daily",
