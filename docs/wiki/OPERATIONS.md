@@ -20,7 +20,7 @@
 
 ## 源码发布
 
-远端 [ivoryshi/invest01](https://github.com/ivoryshi/invest01)，发布分支release/factor-migration-v1；v0.5.0及v0.5.1功能/文档已发布并核验，实际提交见[每日记录](records/DAILY.md)。本机旧main含生成研究缓存祖先，保留本地，不merge到发布分支，不上传旧历史，不强推。
+远端 [ivoryshi/invest01](https://github.com/ivoryshi/invest01)，发布分支release/factor-migration-v1；v0.5.0、v0.5.1及v0.5.2功能/文档已发布并核验，实际提交见[每日记录](records/DAILY.md)。本机旧main含生成研究缓存祖先，保留本地，不merge到发布分支，不上传旧历史，不强推。
 
 发布前：
 
