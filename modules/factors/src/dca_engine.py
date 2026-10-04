@@ -159,7 +159,7 @@ def costs(model):
     return values
 
 
-def run(frame, config):
+def parameters(config):
     if config.get("factorFamilyIds") or config.get("factorWeights"):
         raise ValueError("dca_factor_selection_not_supported")
     settings = config.get("transactionSettings", {})
@@ -196,6 +196,12 @@ def run(frame, config):
     if config.get("rebalanceCalendar") != settings.get("frequency"):
         raise ValueError("dca_frequency_mismatch")
     rates = costs(config.get("costModel", ""))
+    schedule(start, end, settings['frequency'])
+    return settings, start, end, amount, benchmark, weights, rates
+
+
+def run(frame, config):
+    settings, start, end, amount, benchmark, weights, rates = parameters(config)
     frame = frame.copy()
     if frame.empty:
         raise ValueError("insufficient_dca_observations")

@@ -1,5 +1,13 @@
 # 审查记录
 
+## 2026-10-04 · 回测工具/项目Skill v0.5.3
+
+独立只读Agent Wegener发现2P1/2P2：三桶依赖顺序不同导致正确源码也409；旧execute能重新执行已完成guarded请求并替换链接；receipt缺pinned-python执行封装；CLI接受但忽略不适用已知选项。主Agent调整依赖顺序、旧执行前拒绝guarded/preflight请求、补封装SHA、命令专属选项，添加真实API与CLI回归。独立定向复核四项关闭，无新明显阻断，隔离验证无计算/写入绕过、封装字节变化使凭证改变、CLI零网络调用拒绝不适用参数。
+
+Skill前向测试：要求config.research_a按历史当时可见数据因子选基，而只有最新宽表和昨日冻结净值。隔离实际CLI只发GET预检point_in_time_verified，真实政策返回ready=false/SHA=null和historical_information_availability_not_verified，退出2后STOP；没有POST/抓取/冻结/参数修改或自动降级。是隔离模拟任务，不是该ID真实库查询。独立工具/CLI及内存UI检查通过，未运行共享全API测试。主Agent完整回归和真实浏览器范围另见每日记录。
+
+主Agent最终123/123完整回归，五类实际guarded执行与原流程指标一致，portable3、Skill格式/check/build/差异及观察台182通过。4324健康0.5.3与浏览器面板/Skill/执行禁用烟测通过，测试库与冻结0；不是全部旧交互/视觉或完整PIT验收。首次支持断言误加到不支持筛选案例已纠正为明确拒绝，不放宽计算精度。具体Git实际结果另见每日记录。
+
 ## 2026-10-04 · 选定基金源冻结 v0.5.2
 
 独立只读Agent Mill首轮发现2P2：同冻结版本仍可执行另一个子集篮子，违背选择匹配验收；captureSources未纳入身份，篡改后清单校验仍通过。主Agent在共享profile/执行读取入口核对数据库内规范化选择，拒绝篮子子集与基准不符、允许顺序变化；捕获程序/依赖两SHA严格校验并纳入内容身份。追加Python与实际API回归，独立定向复核两项关闭，无新可操作问题。另在隔离fixture复核反序执行、并发同内容冻结/清理、时间标记和未来净值不改变过去账本。

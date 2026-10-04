@@ -19,8 +19,12 @@
 | /custom-expression/preview | POST | config同日定位试算，不生成结果 |
 | /industry-engine/options、/three-bucket-engine/options | GET | 支持参数和固定定义 |
 | /backtest-engine、/execution-plan | GET | 引擎/就绪检查，不执行 |
+| /backtest-tools、/backtest-tools/skill | GET | 五类受保护历史模拟目录/项目Skill正文 |
+| /backtest-tools/preflight?configId=&researchMode= | GET | 只读校验，返回ready/限制/执行凭证，不模拟不写库 |
+| /backtest-tools/run | POST | 冻结数据、同revision/代码凭证、两项明确确认后执行；完整相同凭证复用 |
+| /backtest-tools/audit?artifactId= | GET | 保存结果结构审计，不重算或证明PIT |
 | /run-requests | GET、POST | 请求查询/从已存configId创建 |
-| /run-requests/{requestId}/execute | POST | 同配置revision实际执行 |
+| /run-requests/{requestId}/execute | POST | 旧手工请求实际执行；受保护工具请求返回409，不可绕过凭证 |
 | /result-artifacts、/result-artifacts/{artifactId} | GET | 新结果列表/详情与复核清单 |
 | /fund-screen/options、/fund-screen/profile | GET | 宽表同口径组、字段和源版本 |
 | /fund-nav/catalog?q= | GET | SQLite份额名录搜索；可选snapshotId指定冻结版本 |
@@ -50,6 +54,8 @@
 
 ## 最小执行交接
 
+新Skill与CLI使用[回测工具流程](FACTOR-BACKTEST.md)，先GET预检，再POST受保护执行；正文只允许configId、researchMode、preflightSha256、acknowledgements。确认数组必须精确包含`not_point_in_time_verified`和`proxy_or_adjusted_nav_not_real_execution`两个唯一字符串。当前PIT要求阻止执行，不能用确认强行绕过。下方保留旧手工流程示例，不代表具备新凭证保护。
+
 已有合法config后：
 
 ```sh
@@ -75,7 +81,10 @@ config.your_saved_config与run.RETURNED_ID为占位，使用真实已保存ID。
 | 409 | 源/配置版本变化、冻结字节冲突 | 重读数据版本并确认新配置；损坏冻结不要换current冒充 |
 | 422 | 策略/公式/参数/数据口径不支持 | 检查error和options，不伪填缺失价格或历史因子 |
 | 500 | 查询/环境/读取异常 | 查本地日志、Python环境和源路径，不视为零收益 |
+| 503 | 工具/研究库读取异常或执行不可用 | 停止并只读查询已存资产，不自动重跑或覆盖损坏库 |
 
 不同入口可能将底层错误映射到不同状态，必须同时读取error，不仅按状态猜原因。只拒绝执行不代表草案会被删除。历史列表limit最多100、关键词100字；数据预览最多50返回行和每页后续5000检查行，不代表全样本。算式/回测timeout与输出上限由执行器控制。
 
 databaseMaintenance只登记手动离线命令，不存在HTTP“执行更新/备份/恢复”接口。工具见[数据维护](FACTOR-DATA.md)，不把命令登记当后台任务已完成。
+
+因子写请求单进程互斥，重叠请求返回409 `factor_write_in_progress_do_not_retry_automatically`；多个服务器进程不共享保护。请求和结果仍分文件，不是事务；受保护结果孤立时返回409 `workflow_partial_write_review_required`。CLI不重试，断连/失败先只读查已有请求和结果。

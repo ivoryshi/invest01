@@ -1,6 +1,6 @@
 # 因子数据准备与维护
 
-本页说明v0.5.2的数据边界。回测只使用已有授权数据，不隐式抓取。原始项目和旧fof.db只读。数据库、CSV/Parquet、冻结、备份和历史副本不上传Git，也不通过任意静态路径公开。
+本页说明v0.5.3的数据边界。回测只使用已有授权数据，不隐式抓取。原始项目和旧fof.db只读。数据库、CSV/Parquet、冻结、备份和历史副本不上传Git，也不通过任意静态路径公开。
 
 ## 数据位置
 
@@ -126,4 +126,4 @@ npm run archive:factor-legacy -- --verify
 
 Agent先区分“现时筛选”“手动篮子历史模拟”“PIT历史因子选择”。基金profile与结果提供temporalEligibility.status=not_point_in_time_verified、historicalFactorSelectionAllowed=false，执行器拒绝因子选择配置；不能只改备注解除约束。最新经理、规模、费用、持仓或名录不进入过去的决策。已落地的后向窗口/信号滞后防止使用未来观测值，但没有真实披露与修订时点时，不宣称全部无前视。
 
-下一批回测Skill须读取上述限制、配置revision和源凭证后才执行；PIT查询未来需要同时满足observationDate与availableAt不晚于决策时刻，并按当时可见修订版本选择。该查询尚未实现，不用伪造availableAt或一律加一天代替真实证据。数据抓取仍采用显式增量与原件保留，未经确认不启动定时任务或重抓历史。
+当前[回测工具与Skill](FACTOR-BACKTEST.md)已要求读取上述限制、保存配置revision、冻结输入和源凭证后预检，并须明确授权与确认假设才执行。要求point_in_time_verified会阻止运行，不自动降级。PIT查询未来需要同时满足observationDate与availableAt不晚于决策时刻，并按当时可见修订版本选择。该查询尚未实现，不用伪造availableAt或一律加一天代替真实证据。数据抓取仍采用显式增量与原件保留，未经确认不启动定时任务或重抓历史。

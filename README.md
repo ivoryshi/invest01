@@ -1,8 +1,8 @@
 # 投研工作台01
 
-本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前版本 **v0.5.2 / 因子迁移 V0.19**。源码发布在 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，不是已经部署的在线服务。
+本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前版本 **v0.5.3 / 因子迁移 V0.20**。源码发布在 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，不是已经部署的在线服务。
 
-**因子实验室可执行，但完整迁移尚未关闭。** 历史基金选基/PIT、真实成交、回测Skill及旧页面逐项验收仍有剩余；基金选定数据冻结已接入配置和执行，冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
+**因子实验室可执行，但完整迁移尚未关闭。** 回测工具和项目内Skill首版已接通只读预检、明确确认执行、结果复用与结构审计；历史基金选基/PIT、真实成交及旧页面逐项验收仍有剩余。冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
 
 ## 当前能力
 
@@ -61,6 +61,17 @@ npm run backup:fund-history -- create
 
 基金历史配置可先读取并绑定份额/基准，再冻结选定数据、保存配置并执行。冻结仅复制1至10个选定份额的完整历史、对应名录和一个基准，单次64MiB上限；结果绑定输入SHA及捕获/执行源码SHA。原库更新不影响已冻结实验；缺失、损坏或篮子/基准不符拒绝，不自动改用最新数据。历史可得时间和数据使用约束见[数据时点协议](docs/wiki/FACTOR-DATA.md)中的“数据时点与比较”。
 
+## 回测工具与 Skill
+
+因子页新增原生回测工具区域，使用已保存配置和冻结数据。先预检，再逐项确认两条模拟限制，才可执行；配置、数据或执行代码变化使预检凭证失效。同一完成凭证复用已有结果，不重复生成实验。旧手工执行入口不能重新执行受保护请求。
+
+```sh
+npm run factor:backtest -- catalog --port 4311
+npm run factor:backtest -- preflight --config-id config.your_saved_config --port 4311
+```
+
+`config.your_saved_config`须替换为实际保存ID。预检不写库或生成收益；`ready=true`不证明完整质量或历史可得性。支持五类已有历史模拟，不把最新基金筛选或旧导出当历史回测。详情见[回测操作手册](docs/wiki/FACTOR-BACKTEST.md)和[项目Skill](.agents/skills/factor-backtest/SKILL.md)；不安装全局Skill，不隐式抓取、建快照、改参数或启动定时任务。
+
 ## 开发与验证
 
 ```sh
@@ -78,6 +89,7 @@ npm run test:observatory
 - [因子实验室说明](modules/factors/README.md)：执行器、公式、结果与边界。
 - [数据准备与维护](docs/wiki/FACTOR-DATA.md)：目录、CSV口径、增量导入、冻结、备份恢复。
 - [因子API](docs/wiki/FACTOR-API.md)：读写端点、执行步骤与错误处理。
+- [回测工具与Skill](docs/wiki/FACTOR-BACKTEST.md)：预检、显式执行、结果复用、审计与停止条件。
 - [计算口径](docs/wiki/FACTOR-CALCULATIONS.md)：得分、现金流、收益、归因和误差。
 - [开发验收](docs/wiki/DEVELOPMENT.md)、[运维发布](docs/wiki/OPERATIONS.md)、[当前架构](docs/wiki/ARCHITECTURE.md)。
 - [迁移清单](docs/wiki/FACTOR-MIGRATION.md)、[短状态](docs/wiki/STATUS-SHORT.md)、[任务](docs/wiki/TASKS.md)、[Wiki](docs/wiki/README.md)。

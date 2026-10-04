@@ -11,6 +11,7 @@ import { commonFactorLibrary, factorArtifactCandidates, factorDataAssets, factor
 import { createFrozenSnapshotStore, freezeBindings, frozenSnapshotIdValid } from '../../modules/factors/src/frozen-snapshots.js';
 import { executePinnedPython } from '../../modules/factors/src/pinned-python.js';
 import { listLegacyArchives, queryLegacyRecords, readLegacyArchive } from '../../modules/factors/src/legacy-assets.js';
+import { acknowledgementsValid, backtestSpecs, bytesHash, fingerprint, workflowPolicy, workflowResultAudit, workflowVersion } from '../../modules/factors/src/backtest-tools.js';
 
 const root = fileURLToPath(new URL('../web/', import.meta.url));
 const projectRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -144,7 +145,18 @@ const assets = new Map([
   ['/module-loader.js', ['module-loader.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
 ]);
-export async function dispatchRequest({ modules, standalone, snapshotStore = defaultSnapshotStore } = {}, { method = 'GET', url: rawUrl = '/', body } = {}) {
+let factorWriteBusy = false;
+export async function dispatchRequest(options = {}, request = {}) {
+  let mutation = false;
+  try { mutation = new URL(request.url || '/', 'http://localhost').pathname.startsWith('/api/modules/factors/v1/') && !['GET', 'HEAD'].includes(request.method || 'GET'); } catch { /* URL validation stays in the dispatcher. */ }
+  if (!mutation) return dispatchUnlocked(options, request);
+  if (factorWriteBusy) return { status: 409, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: 'factor_write_in_progress_do_not_retry_automatically' }) };
+  factorWriteBusy = true;
+  try { return await dispatchUnlocked(options, request); }
+  finally { factorWriteBusy = false; }
+}
+
+async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSnapshotStore } = {}, { method = 'GET', url: rawUrl = '/', body } = {}) {
   const publicAssets = moduleAssets(modules);
   const headers = {
     'X-Content-Type-Options': 'nosniff',
@@ -162,7 +174,8 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
   const factorRunExecuteWrite = /^\/api\/modules\/factors\/v1\/run-requests\/[^/]+\/execute$/.test(url.pathname);
   const factorSnapshotWrite = url.pathname === '/api/modules/factors/v1/snapshots/frozen' || /^\/api\/modules\/factors\/v1\/snapshots\/frozen\/[^/]+\/verify$/.test(url.pathname);
   const expressionWrite = ['/api/modules/factors/v1/custom-expression/validate','/api/modules/factors/v1/custom-expression/preview'].includes(url.pathname);
-  if (method !== 'GET' && method !== 'HEAD' && !((factorLibraryWrite || factorConfigWrite) && ['POST', 'PUT'].includes(method)) && !(factorRunRequestWrite && method === 'POST') && !(factorRunExecuteWrite && method === 'POST') && !(factorSnapshotWrite && method === 'POST') && !(expressionWrite && method === 'POST')) {
+  const workflowWrite = url.pathname === '/api/modules/factors/v1/backtest-tools/run';
+  if (method !== 'GET' && method !== 'HEAD' && !((factorLibraryWrite || factorConfigWrite) && ['POST', 'PUT'].includes(method)) && !(factorRunRequestWrite && method === 'POST') && !(factorRunExecuteWrite && method === 'POST') && !(factorSnapshotWrite && method === 'POST') && !(expressionWrite && method === 'POST') && !(workflowWrite && method === 'POST')) {
     return json(405, { error: 'method_not_allowed' }, { Allow: 'GET, HEAD' });
   }
   if (standalone && url.pathname === '/') return reply(302, '', { Location: `/modules/${standalone}/` });
@@ -175,7 +188,7 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.2', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.3', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -203,6 +216,7 @@ export async function dispatchRequest({ modules, standalone, snapshotStore = def
     if (url.pathname === '/api/modules/factors/v1/experiment-configs') return factorExperimentConfigs({ method, body, json });
     if (url.pathname.startsWith('/api/modules/factors/v1/experiment-configs/')) return factorExperimentConfig(url, { method, body, json });
     if (url.pathname === '/api/modules/factors/v1/execution-plan') return factorExecutionPlan(json);
+    if (url.pathname === '/api/modules/factors/v1/backtest-tools' || url.pathname.startsWith('/api/modules/factors/v1/backtest-tools/')) return factorBacktestTools(url, { method, body, json, snapshotStore });
     if (url.pathname === '/api/modules/factors/v1/industry-engine/options') {
       const { stdout } = await executePinnedPython(path.join(projectRoot, 'modules/factors/src/industry_engine.py'), ['--definitions'], { timeout: 10000 });
       return json(200, JSON.parse(stdout));
@@ -1809,6 +1823,100 @@ async function factorExecutionPlan(json) {
   });
 }
 
+async function readWorkflowStore(file) {
+  try {
+    const data = JSON.parse(await readFile(file, 'utf8'));
+    if (!Array.isArray(data.items)) throw new Error('invalid_store');
+    return data;
+  } catch (error) {
+    if (error.code === 'ENOENT') return { schemaVersion: 1, module: 'factors', items: [] };
+    throw Object.assign(new Error('workflow_store_unreadable'), { status: 503 });
+  }
+}
+
+async function backtestPreflight(config, researchMode, snapshotStore) {
+  const policy = workflowPolicy(config, researchMode), selected = backtestSpecs[config.strategyTemplateId];
+  const result = { version: workflowVersion, configId: config.configId, configRevision: config.revision, snapshotId: config.snapshotId,
+    ...policy, ready: false, preflightSha256: null, preflightScope: 'parameters_and_frozen_inputs_no_simulation_no_write' };
+  if (policy.blockers.length) return result;
+  try {
+    const assetIds = freezeBindings[selected.baseSnapshotId], inputs = [];
+    for (const assetId of assetIds) inputs.push(await factorInput(config.snapshotId, assetId, selected.baseSnapshotId, snapshotStore));
+    const modules = [...selected.modules, selected.python].map(name => ({ name, path: path.join(projectRoot, `modules/factors/src/${name}.py`) }));
+    const validated = await executePinnedPython(path.join(projectRoot, 'modules/factors/src/backtest_preflight.py'), [JSON.stringify(config), JSON.stringify(inputs)], { modules, timeout: 30000, maxBuffer: 1024*1024 });
+    const validation = JSON.parse(validated.stdout);
+    if (validation.error) throw Object.assign(new Error(validation.error), { status: 422 });
+    // The handoff fingerprints include protocol code, not just the interpreter's inputs.
+    const orchestrationSources = [];
+    for (const name of ['apps/api/server.js', 'modules/factors/src/backtest-tools.js', 'modules/factors/src/pinned-python.js', 'packages/contracts/factors.js']) orchestrationSources.push({ path: name, sha256: bytesHash(await readFile(path.join(projectRoot, name))) });
+    const hashes = new Map(validated.sourceHashes.map(row => [row.moduleName, row.sha256]));
+    const calculationSources = [{ moduleName: '__main__', sha256: hashes.get(selected.python) }, ...selected.modules.map(name => ({ moduleName: name, sha256: hashes.get(name) }))];
+    const receipt = { version: workflowVersion, config, policy, frozenSnapshot: inputs[0].snapshot, validation,
+      validatorSources: validated.sourceHashes, orchestrationSources, calculationSources };
+    return { ...result, ready: true, validation, frozenSnapshot: inputs[0].snapshot, calculationSources,
+      preflightSha256: fingerprint(receipt) };
+  } catch (error) { return { ...result, blockers: [error.status ? error.message : 'backtest_preflight_unavailable'], errorStatus: error.status || 503 }; }
+}
+
+async function factorBacktestTools(url, { method, body, json, snapshotStore }) {
+  const base = '/api/modules/factors/v1/backtest-tools', mode = url.pathname.slice(base.length);
+  try {
+    if (mode === '' && ['GET', 'HEAD'].includes(method)) return json(200, { version: workflowVersion, mode: 'native_backtest_tools',
+      strategies: Object.entries(backtestSpecs).map(([strategyTemplateId, value]) => ({ strategyTemplateId, ...value })),
+      skill: { name: 'factor-backtest', path: '.agents/skills/factor-backtest/SKILL.md', contentEndpoint: base + '/skill' },
+      commands: ['catalog', 'preflight', 'run', 'audit'], policy: 'frozen_inputs_explicit_assumptions_manual_run_no_fetch_no_auto_retry' });
+    if (mode === '/skill' && ['GET', 'HEAD'].includes(method)) return json(200, { name: 'factor-backtest', content: await readFile(path.join(projectRoot, '.agents/skills/factor-backtest/SKILL.md'), 'utf8') });
+    if (mode === '/audit' && ['GET', 'HEAD'].includes(method)) {
+      const id = url.searchParams.get('artifactId');
+      if (!validResultArtifactId(id)) return json(400, { error: 'invalid_artifact_id' });
+      const [results, requests] = await Promise.all([readWorkflowStore(factorResultArtifactFile), readWorkflowStore(factorRunRequestFile)]);
+      const item = results.items.find(row => row.artifactId === id);
+      if (!item) return json(404, { error: 'result_artifact_not_found' });
+      return json(200, workflowResultAudit(item, requests.items.find(row => row.requestId === item.requestId)));
+    }
+    if (!['/preflight', '/run'].includes(mode)) return json(404, { error: 'backtest_tool_not_found' });
+    if (mode === '/preflight' && !['GET', 'HEAD'].includes(method) || mode === '/run' && method !== 'POST') return json(405, { error: 'method_not_allowed' });
+    const parsed = mode === '/run' ? parseJsonBody(body) : { value: { configId: url.searchParams.get('configId'), researchMode: url.searchParams.get('researchMode') || 'assumption_simulation' } };
+    if (parsed.error) return json(400, parsed);
+    const input = parsed.value;
+    if (!input || typeof input !== 'object' || Array.isArray(input) || !validConfigId(input.configId)) return json(400, { error: 'invalid_config_id' });
+    if (mode === '/run' && (Object.keys(input).some(key => !['configId', 'researchMode', 'preflightSha256', 'acknowledgements'].includes(key)) || !/^[a-f0-9]{64}$/.test(input.preflightSha256 || ''))) return json(422, { error: 'valid_preflight_receipt_required' });
+    const configs = await readWorkflowStore(factorExperimentConfigFile), config = configs.items.find(row => row.configId === input.configId);
+    if (!config) return json(404, { error: 'experiment_config_not_found' });
+    const researchMode = input.researchMode || 'assumption_simulation';
+    const required = workflowPolicy(config, researchMode).requiredAcknowledgements;
+    if (mode === '/run' && !acknowledgementsValid(input.acknowledgements, required)) return json(422, { error: 'explicit_limitations_acknowledgement_required', requiredAcknowledgements: required });
+    const preflight = await backtestPreflight(config, researchMode, snapshotStore);
+    if (mode === '/preflight') return json(200, preflight);
+    if (!preflight.ready) return json(preflight.errorStatus || 422, { error: 'backtest_preflight_blocked', preflight });
+    if (preflight.preflightSha256 !== input.preflightSha256) return json(409, { error: 'backtest_preflight_changed_repeat_review' });
+    const [requests, results] = await Promise.all([readWorkflowStore(factorRunRequestFile), readWorkflowStore(factorResultArtifactFile)]);
+    const previous = results.items.find(row => row.experimentId === config.configId && row.dataScope?.workflowReceipt?.preflightSha256 === input.preflightSha256);
+    if (previous) {
+      const request = requests.items.find(row => row.requestId === previous.requestId && row.resultArtifactId === previous.artifactId);
+      if (!request) return json(409, { error: 'workflow_partial_write_review_required', artifactId: previous.artifactId });
+      return json(200, { reused: true, item: request, resultArtifact: previous, audit: workflowResultAudit(previous, request) });
+    }
+    const normalized = normalizeRunRequest({ configId: config.configId }, { configs: configs.items, existing: requests.items });
+    if (normalized.error) return json(422, normalized);
+    const request = { ...normalized.item, createdAt: new Date().toISOString(), requestedMode: 'guarded_backtest' };
+    const artifact = await buildLocalFactorResultArtifact({ request, config, existing: results.items, snapshotStore });
+    const actualSources = artifact.dataScope.calculationSources || [{ moduleName: '__main__', sha256: artifact.dataScope.calculationSourceSha256 }];
+    if (fingerprint(actualSources) !== fingerprint(preflight.calculationSources)) return json(409, { error: 'backtest_calculation_source_changed' });
+    const freshConfig = (await readWorkflowStore(factorExperimentConfigFile)).items.find(row => row.configId === config.configId);
+    const fresh = freshConfig ? await backtestPreflight(freshConfig, researchMode, snapshotStore) : null;
+    if (!fresh?.ready || fresh.preflightSha256 !== input.preflightSha256) return json(409, { error: 'backtest_preflight_changed_during_execution' });
+    artifact.dataScope.workflowReceipt = { version: workflowVersion, preflightSha256: input.preflightSha256, configRevision: config.revision,
+      snapshotId: config.snapshotId, researchMode, temporalEligibility: preflight.temporalEligibility, acknowledgements: input.acknowledgements };
+    const now = new Date().toISOString();
+    const completed = { ...request, status: 'completed_local_result_artifact', approvalState: 'explicit_assumptions_acknowledged', resultArtifactId: artifact.artifactId, executedAt: now, updatedAt: now, preflightSha256: input.preflightSha256 };
+    results.items.push(artifact); requests.items.push(completed);
+    // Separate stores are not a transaction. A partial commit is reported and never blindly rerun.
+    await writeFactorResultArtifacts(results); await writeFactorRunRequests(requests);
+    return json(200, { reused: false, item: completed, resultArtifact: artifact, audit: workflowResultAudit(artifact, completed) });
+  } catch (error) { return json(error.status || 503, { error: error.status ? error.message : 'backtest_tool_unavailable_review_before_retry' }); }
+}
+
 async function factorBacktestEngine(json) {
   const [panel, assets, results] = await Promise.all([
     readOldFactorJson('out/panel.json'),
@@ -1958,6 +2066,7 @@ async function factorRunRequestExecute(url, { method, json, snapshotStore }) {
   const index = requests.items.findIndex(item => item.requestId === requestId);
   if (index < 0) return json(404, { error: 'run_request_not_found' });
   const request = requests.items[index];
+  if (request.requestedMode === 'guarded_backtest' || request.preflightSha256) return json(409, { error: 'guarded_request_requires_backtest_tool', resultArtifactId: request.resultArtifactId || null });
   const config = configs.items.find(item => item.configId === request.configId);
   if (!config) return json(422, { error: 'config_not_found_for_request' });
   let artifact;

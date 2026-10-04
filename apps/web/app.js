@@ -463,6 +463,7 @@ let editThreeBucketConfig = null;
 let editFundNavConfig = null;
 let refreshFundNavSnapshotChoices = null;
 let refreshFrozenSnapshotList = null;
+let refreshBacktestTools = null;
 let editExpressionFactor = null;
 let editExpressionConfig = null;
 
@@ -2452,6 +2453,79 @@ async function fundScreenWorkbenchPanel() {
   panel.append(form, dictionary);
   return panel;
 }
+async function backtestToolsPanel() {
+  const panel = element('section', null, 'execution-plan-panel'); panel.id = 'backtest-tools';
+  panel.append(element('h2', '回测工具与 Skill'));
+  const form = document.createElement('form'); form.className = 'strategy-grid-form';
+  const choiceLabel = element('label', '实验配置'), choice = document.createElement('select'); choice.name = 'configId'; choiceLabel.append(choice);
+  const modeLabel = element('label', '研究范围'), mode = document.createElement('select'); mode.name = 'researchMode';
+  mode.append(option('assumption_simulation', '假设性模拟'), option('point_in_time_verified', '要求历史当时可见数据')); modeLabel.append(mode);
+  const preflight = element('button', '预检数据与配置'); preflight.type = 'submit';
+  const run = element('button', '确认并执行回测'); run.type = 'button'; run.disabled = true;
+  const message = element('p', '', 'form-message'); message.setAttribute('role', 'status');
+  const detail = element('section'), acknowledgement = element('section'), auditView = element('section');
+  let receipt = null, generation = 0, busy = false;
+  function clear() { generation += 1; receipt = null; run.disabled = true; detail.replaceChildren(); acknowledgement.replaceChildren(); auditView.replaceChildren(); }
+  async function loadConfigs() {
+    const response = await fetch('/api/modules/factors/v1/experiment-configs'), data = await response.json();
+    if (!response.ok) throw new Error(data.error || '配置读取失败');
+    const preferred = choice.value;
+    choice.replaceChildren(option('', '选择已保存配置'));
+    data.items.forEach(item => choice.append(option(item.configId, `${item.title} · revision ${item.revision}`)));
+    choice.value = data.items.some(item => item.configId === preferred) ? preferred : '';
+  }
+  function sync() { run.disabled = busy || !receipt?.ready || [...acknowledgement.querySelectorAll('input')].some(input => !input.checked); }
+  choice.addEventListener('change', clear); mode.addEventListener('change', clear);
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); if (busy || !choice.value) return;
+    clear(); const sent = generation; busy = true; preflight.disabled = true; sync();
+    try {
+      const response = await fetch('/api/modules/factors/v1/backtest-tools/preflight?' + new URLSearchParams({ configId: choice.value, researchMode: mode.value }));
+      const data = await response.json(); if (sent !== generation) return;
+      if (!response.ok) throw new Error(data.error || '预检失败'); receipt = data;
+      message.textContent = data.ready ? `预检完成 · revision ${data.configRevision} · 仍需确认研究假设` : `已阻断：${data.blockers.join(' / ')}`;
+      detail.append(element('p', `数据版本：${data.snapshotId}`), element('p', `历史信息可得性：${data.temporalEligibility.status}`));
+      if (data.ready) {
+        detail.append(element('p', `预检凭证：${data.preflightSha256}`));
+        for (const text of data.limitations) detail.append(element('p', text, 'warning'));
+        const labels = { not_point_in_time_verified: '接受未通过历史披露/修订时点验证，仅作假设性模拟', proxy_or_adjusted_nav_not_real_execution: '接受指数/复权净值代理及模拟费用，不视为真实成交或申赎结果' };
+        for (const key of data.requiredAcknowledgements) {
+          const label = element('label', labels[key] || key), input = document.createElement('input'); input.type = 'checkbox'; input.value = key;
+          input.addEventListener('change', sync); label.prepend(input); acknowledgement.append(label);
+        }
+      }
+    } catch (error) { if (sent === generation) message.textContent = error.message; }
+    finally { busy = false; preflight.disabled = false; sync(); }
+  });
+  run.addEventListener('click', async () => {
+    if (run.disabled || !receipt?.ready) return;
+    const sent = generation, selected = receipt; busy = true; choice.disabled = mode.disabled = preflight.disabled = true; sync();
+    try {
+      const response = await fetch('/api/modules/factors/v1/backtest-tools/run', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configId: selected.configId, researchMode: selected.researchMode, preflightSha256: selected.preflightSha256,
+          acknowledgements: [...acknowledgement.querySelectorAll('input')].filter(input => input.checked).map(input => input.value) }) });
+      const data = await response.json();
+      if (sent !== generation) return;
+      if (!response.ok) { clear(); throw new Error(`${data.error || '执行失败'}；请检查已有请求和结果，勿自动重试。`); }
+      message.textContent = `${data.reused ? '复用已有结果' : '已生成结果'}：${data.resultArtifact.artifactId} · 审计${data.audit.status}`;
+      auditView.replaceChildren(resultDiagnosticTable('结果交接审计', ['检查', '状态'], data.audit.checks.map(row => [row.checkId, row.status])), element('p', data.audit.note, 'warning'));
+      receipt = null; await refreshFactorExecution?.();
+    } catch (error) { receipt = null; message.textContent = error.message; }
+    finally { busy = false; choice.disabled = mode.disabled = preflight.disabled = false; sync(); }
+  });
+  const skill = document.createElement('details'), summary = element('summary', '项目 Skill：factor-backtest');
+  skill.append(summary); let loaded = false;
+  skill.addEventListener('toggle', async () => {
+    if (!skill.open || loaded) return; loaded = true;
+    try { const response = await fetch('/api/modules/factors/v1/backtest-tools/skill'), data = await response.json(); if (!response.ok) throw new Error('Skill读取失败'); skill.append(element('pre', data.content)); }
+    catch (error) { loaded = false; skill.append(element('p', error.message, 'warning')); }
+  });
+  form.append(choiceLabel, modeLabel, preflight); panel.append(form, message, detail, acknowledgement, run, auditView, skill);
+  refreshBacktestTools = async () => { if (panel.isConnected && !busy) { clear(); await loadConfigs(); } };
+  try { await loadConfigs(); } catch (error) { message.textContent = error.message; }
+  return panel;
+}
+
 async function executionPlanPanel() {
   let plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
   let results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
@@ -2834,6 +2908,7 @@ async function executionPlanPanel() {
     plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
     results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
     renderReadiness(); renderRequests(); renderResults(); renderForm(); await renderResultDetail();
+    await refreshBacktestTools?.();
   };
   renderReadiness();
   renderRequests();
@@ -3181,7 +3256,7 @@ try {
   async function render() {
     if (cleanup) cleanup();
     cleanup = null;
-    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; editExpressionFactor = null; editExpressionConfig = null;
+    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editExpressionFactor = null; editExpressionConfig = null;
     const selected = items.find(item => item.id === location.hash.slice(1)) || items[0];
     for (const a of nav.children) {
       if (a.hash === `#${selected.id}`) a.setAttribute('aria-current', 'page');
@@ -3223,6 +3298,7 @@ try {
       content.append(await fundScreenWorkbenchPanel());
       content.append(await customFactorStudioPanel(library));
       content.append(await backtestEnginePanel());
+      content.append(await backtestToolsPanel());
       content.append(await executionPlanPanel());
       content.append(await factorsPanel());
       content.append(await experimentConfigPanel(library));
