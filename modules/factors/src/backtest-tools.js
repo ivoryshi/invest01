@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 export const workflowVersion = 'factor-backtest-workflow-v1';
 const spec = (baseSnapshotId, python, modules, scope) => ({ baseSnapshotId, python, modules, scope });
 export const backtestSpecs = {
+  'strategy.legacy_510300_pe_dca': spec('snapshot.legacy.510300.archive', 'legacy_dca_engine', ['legacy_html_literals', 'dca_engine'], 'archived_510300_pe_vwap_simulation'),
   'strategy.fund_nav_fixed_dca': spec('snapshot.fund_warehouse.nav_db.current', 'fund_nav_engine', ['dca_engine', 'fund_history_store'], 'manual_fund_basket_simulation'),
   'strategy.industry_parquet_monthly_topn': spec('snapshot.etf_smartbeta.industry_execution.current', 'industry_engine', [], 'lagged_industry_proxy_simulation'),
   'strategy.custom_industry_expression': spec('snapshot.etf_smartbeta.industry_execution.current', 'custom_industry_engine', ['industry_engine', 'factor_expression'], 'custom_lagged_industry_proxy_simulation'),

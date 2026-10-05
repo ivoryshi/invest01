@@ -1,10 +1,10 @@
 # 投研工作台01
 
-本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前本地版本 **v0.5.4 / 因子迁移 V0.21**。源码发布使用 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，本版远端状态以发布回执为准，不是已经部署的在线服务。
+本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前本地版本 **v0.5.5 / 因子迁移 V0.22**。源码发布使用 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，本版远端状态以发布回执为准，不是已经部署的在线服务。
 
 **因子实验室可执行，但完整迁移尚未关闭。** 回测工具和项目内Skill首版已接通只读预检、明确确认执行、结果复用与结构审计；历史基金选基/PIT、真实成交及旧页面逐项验收仍有剩余。冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
 
-本批补齐图表日期/区间/框选/缩放、账户收益/回撤、共同窗比较、全部结果查询、实际子因子槽位权重与导出，以及510300归档PE择时复算（分档倍数/现金池/月内买入日/均线与买停标记）。归档复算是只读预览，可下载/载入参数文件，不进入正式配置/请求/结果库或绕过guarded工具。真实浏览器完整操作仍未验收，统一证据和剩余项见[迁移验收](docs/wiki/FACTOR-ACCEPTANCE.md)。
+已补齐图表日期/区间/框选/缩放、账户收益/回撤、共同窗比较、全部结果查询、实际子因子槽位权重与导出，以及510300归档PE择时复算（分档倍数/现金池/月内买入日/均线与买停标记）。本版将PE纳入正式资产闭环：选择归档→冻结→保存/修改配置→统一预检与双确认→执行→请求/结果入库及审计。原有预览继续只读，参数文件可往返，不自动运行或绕过guarded工具。真实浏览器完整操作仍未验收，统一证据和剩余项见[迁移验收](docs/wiki/FACTOR-ACCEPTANCE.md)。
 
 ## 当前能力
 
@@ -72,7 +72,7 @@ npm run factor:backtest -- catalog --port 4311
 npm run factor:backtest -- preflight --config-id config.your_saved_config --port 4311
 ```
 
-`config.your_saved_config`须替换为实际保存ID。预检不写库或生成收益；`ready=true`不证明完整质量或历史可得性。支持五类已有历史模拟，不把最新基金筛选或旧导出当历史回测。详情见[回测操作手册](docs/wiki/FACTOR-BACKTEST.md)和[项目Skill](.agents/skills/factor-backtest/SKILL.md)；不安装全局Skill，不隐式抓取、建快照、改参数或启动定时任务。
+`config.your_saved_config`须替换为实际保存ID。预检不写库或生成收益；`ready=true`不证明完整质量或历史可得性。支持六类已有历史模拟（含510300归档PE），不把最新基金筛选或旧导出当历史回测。详情见[回测操作手册](docs/wiki/FACTOR-BACKTEST.md)和[项目Skill](.agents/skills/factor-backtest/SKILL.md)；不安装全局Skill，不隐式抓取、建快照、改参数或启动定时任务。
 
 ## 开发与验证
 

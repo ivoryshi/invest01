@@ -21,7 +21,7 @@
 | /legacy-dca/preview | POST | 固定archiveId/sourceSha256与完整parameters只读复算；不写配置/请求/结果 |
 | /industry-engine/options、/three-bucket-engine/options | GET | 支持参数和固定定义 |
 | /backtest-engine、/execution-plan | GET | 引擎/就绪检查，不执行 |
-| /backtest-tools、/backtest-tools/skill | GET | 五类受保护历史模拟目录/项目Skill正文 |
+| /backtest-tools、/backtest-tools/skill | GET | 六类受保护历史模拟目录/项目Skill正文，含归档PE |
 | /backtest-tools/preflight?configId=&researchMode= | GET | 只读校验，返回ready/限制/执行凭证，不模拟不写库 |
 | /backtest-tools/run | POST | 冻结数据、同revision/代码凭证、两项明确确认后执行；完整相同凭证复用 |
 | /backtest-tools/audit?artifactId= | GET | 保存结果结构审计，不重算或证明PIT |
@@ -62,7 +62,17 @@
 
 示例ID/SHA是占位，不可直接执行。`nth`只允许1/2/3/5/10/15/-1；PE口径TTM/LYR/MED，回看整数1—20年；最多12档严格递增并终止100，倍数0—10。参数集合精确匹配，来源缺失404、SHA变化409、不支持/不合法422。归档源每次核验字节，解析严格JSON而非运行JavaScript；计算源码固定捕获并返回主/依赖SHA。
 
-返回完整`accountLedger/trades/cashFlows/metrics/parameters/sourceVersion/calculationSources`及`not_point_in_time_verified`；无`requestId/artifactId`，不进入正式资产库、不自动抓取/冻结/保存。参数文件可下载和重新载入页面，后端仍完整校验；导出不意味着已经保存为正式实验。此预览不属于backtest-tools五类冻结模拟，不通过它绕过guarded研究执行。费用、现金流和旧逻辑修正见[验收计算差异](FACTOR-ACCEPTANCE.md)。
+返回完整`accountLedger/trades/cashFlows/metrics/parameters/sourceVersion/calculationSources`及`not_point_in_time_verified`；无`requestId/artifactId`，预览本身不进入正式资产库、不自动抓取/冻结/保存。参数文件可下载和重新载入页面，后端仍完整校验；导出不意味着已经保存为正式实验。正式PE执行另沿下面冻结/配置/guarded链路，不通过预览绕过确认。费用、现金流和旧逻辑修正见[验收计算差异](FACTOR-ACCEPTANCE.md)。
+
+### 510300 PE正式资产
+
+GET `/legacy-dca/frozen-options?snapshotId=...` 从已校验冻结副本安全读取options，返回冻结绑定archiveId/SHA，无原件依赖，不写库/重跑。未知/不匹配快照拒绝，损坏409；不能用它自动修复副本。编辑已保存PE时先GET最新配置，再读取其冻结options。PE PUT必须携带读取时的数值`expectedRevision`，与当前版本不符409且不写；保留草案供用户重新载入核对，禁止无条件覆盖或自动重试。PE不能通过通用表单变为另一策略类型。
+
+POST `/snapshots/frozen` 选择 `baseSnapshotId="snapshot.legacy.510300.archive"`，`selection`必须且只能为 `{archiveId,sourceSha256}`；两者64位十六进制，从options读取真实值。复制已登记原件并核SHA，副本文件名固定510300.html，64MiB限额、内容身份包含选择，不接受路径或自动换版本。冻结后不再依赖原归档可用性。
+
+通过标准POST `/experiment-configs`、PUT `/experiment-configs/:id`保存或修改：`strategyTemplateId="strategy.legacy_510300_pe_dca"`，绑定返回的冻结ID、`benchmarkId="510300_fixed_dca_vwap"`、`universe="archived_510300_adjusted_vwap"`、`portfolioRule="pe_ladder_monthly_dca"`、`rebalanceCalendar="monthly"`；`factorFamilyIds/factorWeights`为空，`transactionSettings={}`，`strategySettings={archiveId,sourceSha256,parameters}`。parameters同预览全部字段，不可加入忽略项；`costModel="commission=<fee>;slippage=<slippage>"`必须与参数数值一致。保存仅记录草案，不运行或证明可计算。
+
+再调用 `/backtest-tools/preflight` 和双确认 `/backtest-tools/run`，统一凭证与Skill适用。预检核副本字节、归档选择、参数/费用/基准/范围；执行前后绑定revision/SHA/源码。结果保存全序列/账本/交易、`cashFlows`与`benchmarkCashFlows`和单独XIRR，生成真实requestId/artifactId并可查询、导出、比较/结构审计。比较要求两个账户各自投入日期/金额一致，另绑定利率/费用/月内日/投入模式及真实策略身份，不能只查策略现金流。PE手工 `run-requests/:id/execute`返回422，已完成guarded请求返回409；同凭证复用不重算。冻结、正式入库均不证明PIT、VWAP可实现成交或因果Alpha。
 
 基金冻结POST /snapshots/frozen正文为baseSnapshotId="snapshot.fund_warehouse.nav_db.current"、可选title、必填selection。selection精确包含codes数组、benchmarkId、profile返回的sourceVersions，凭证按universe_master、请求codes顺序、benchmark顺序原样传入。不得填客户端自造SHA。返回snapshotId后显式写入配置再保存，不自动保存或执行。GET返回freezeOptions.selectionRequired=true；通用文件冻结表单不代替基金选定源绑定。冻结profile/execute要求同一篮子与基准（篮子顺序可不同），变化需另建快照。
 

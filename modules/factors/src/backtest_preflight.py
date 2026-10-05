@@ -5,6 +5,18 @@ import sys
 
 def preflight(config, paths):
     kind = config['strategyTemplateId']
+    if kind == 'strategy.legacy_510300_pe_dca':
+        import hashlib
+        from pathlib import Path
+        import legacy_dca_engine as engine
+        source = paths[0]
+        raw = Path(source['storageRef']).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != source['expectedSha256']:
+            raise ValueError('legacy_archive_integrity_failed')
+        base, pe = engine.load(raw)
+        p = engine.validate_config(config, source['expectedSha256'], source['snapshot']['selection'])
+        engine.validate_period(base, p)
+        return {'parameterValidation': 'engine_validator_passed', 'profile': {'priceObservations': len(base['D']), 'peObservations': len(pe['D'])}}
     if kind == 'strategy.fund_nav_fixed_dca':
         import fund_nav_engine as engine
         settings, start, end, _ = engine.validate(config)

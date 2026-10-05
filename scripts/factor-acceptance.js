@@ -22,7 +22,7 @@ const probes = [
   ['custom-expression/options', data => Array.isArray(data.families)],
   ['fund-nav/catalog?q=014165', data => data.database?.storage === 'workbench_sqlite'],
   ['fund-screen/options', data => Array.isArray(data.fields)],
-  ['backtest-tools', data => data.strategies?.length === 5 && data.commands?.includes('audit')],
+  ['backtest-tools', data => data.strategies?.length === 6 && data.strategies.some(row=>row.strategyTemplateId==='strategy.legacy_510300_pe_dca') && data.commands?.includes('audit')],
   ['backtest-tools/skill', data => data.name === 'factor-backtest' && data.content?.includes('point_in_time_verified')],
   ['execution-plan', data => Array.isArray(data.configReadiness) && Array.isArray(data.runRequests)],
   ['run-requests', data => Array.isArray(data.items)],

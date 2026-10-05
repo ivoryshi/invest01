@@ -143,6 +143,9 @@ export const factorExperimentContract = {
 };
 
 export const factorDataAssets = [
+  { assetId: 'factors.legacy.510300', module: 'factors', title: '510300归档行情与PE版本', assetType: 'archived_html_data',
+    storageRef: '510300.html', refreshMode: 'manual_archive_selection', ownerProject: workbenchRoot, asOfDate: null,
+    hashPolicy: 'selected_archive_full_content_sha256', notes: '仅从已登记归档按archiveId/SHA读取，冻结时安全复制；不执行HTML，不提供任意路径。' },
   { assetId: 'factors.fund_warehouse.nav_db', module: 'factors', title: '基金历史净值 SQLite（新工作台）', assetType: 'sqlite_store',
     storageRef: fileURLToPath(new URL('../../var/factors/fund-history.sqlite', import.meta.url)), refreshMode: 'manual',
     ownerProject: workbenchRoot, asOfDate: null, hashPolicy: 'selected_import_source_sha_in_read_transaction',
@@ -263,6 +266,12 @@ export const factorDataAssets = [
 ];
 
 export const factorSnapshotCandidates = [
+  { snapshotId: 'snapshot.legacy.510300.archive', datasetId: 'factors.legacy.510300', title: '510300 PE定投归档数据',
+    asOfDate: null, universe: 'archived_510300_adjusted_vwap', frequency: 'daily_observation_monthly_dca',
+    periodStart: null, periodEnd: null, sourceIds: [], hash: 'selected_archive_full_content_sha256', createdAt: null,
+    comparisonGroup: 'legacy_510300_pe_cashflow', assetIds: ['factors.legacy.510300'],
+    limitations: ['pe_observation_not_available_at', 'archived_vwap_not_real_execution'],
+    notes: '必须明确选定归档ID与SHA后冻结；本对象不是可直接执行的当前文件路径。' },
   {
     snapshotId: 'snapshot.fund_warehouse.nav_db.current', datasetId: 'factors.fund_warehouse.nav_db',
     title: '手动基金篮子历史净值（数据库导入版本绑定）', asOfDate: null, universe: 'manual_fund_share_basket',

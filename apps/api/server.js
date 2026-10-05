@@ -23,7 +23,9 @@ const factorRunRequestFile = path.join(projectRoot, 'var/factors/run-requests.js
 const factorResultArtifactFile = path.join(projectRoot, 'var/factors/result-artifacts.json');
 const factorLegacyArchiveRoot = path.join(projectRoot, 'var/factors/legacy-archives');
 const execFileAsync = promisify(execFile);
-const defaultSnapshotStore = createFrozenSnapshotStore({ root: path.join(projectRoot, 'var/factors/frozen-snapshots'), candidates: factorSnapshotCandidates, assets: factorDataAssets });
+const defaultSnapshotStore = createFrozenSnapshotStore({ root: path.join(projectRoot, 'var/factors/frozen-snapshots'), candidates: factorSnapshotCandidates, assets: factorDataAssets, legacyArchiveRoot: factorLegacyArchiveRoot });
+const legacyDcaEngine = { artifactCandidateId: 'artifact.factor.legacy_510300_pe_dca', title: '510300归档PE定投',
+  artifactType: 'backtest_engine', computePolicy: 'frozen_archive_pe_lagged_vwap_simulation', inputSnapshotIds: ['snapshot.legacy.510300.archive'] };
 const fundScreenEngine = {
   artifactCandidateId: 'artifact.factor.fund_cross_section_screen', title: '基金宽表同组筛选执行器',
   artifactType: 'cross_section_screen', status: 'local_execution_available',
@@ -71,31 +73,34 @@ async function customConfigCheck(item, configs) {
   if (!current && !recorded) throw Object.assign(new Error('custom_program_revision_not_registered'), { status: 422 });
   await expressionPython('preflight', item);
 }
-async function legacyDcaApi(url, { method, body, json }) {
+async function legacyDcaApi(url, { method, body, json, snapshotStore }) {
   try {
-    const options = url.pathname.endsWith('/options');
+    const frozenOptions = url.pathname.endsWith('/frozen-options');
+    const options = frozenOptions || url.pathname.endsWith('/options');
     if (!(options ? ['GET','HEAD'].includes(method) : method === 'POST')) return json(405, {error:'method_not_allowed'});
     const parsed = options ? {value:{}} : parseJsonBody(body);
     if (parsed.error) return json(400, parsed);
     if (!parsed.value || typeof parsed.value !== 'object' || Array.isArray(parsed.value)) return json(422,{error:'legacy_dca_object_required'});
     if (!options && (Object.keys(parsed.value).some(key => !['archiveId','sourceSha256','parameters'].includes(key)) || !parsed.value.archiveId || !parsed.value.sourceSha256)) return json(422,{error:'legacy_dca_version_bound_parameters_required'});
-    const archives = await listLegacyArchives(factorLegacyArchiveRoot);
+    const archives = frozenOptions ? {items:[]} : await listLegacyArchives(factorLegacyArchiveRoot);
     const archiveId = options ? (url.searchParams.get('archiveId') || archives.items[0]?.archiveId) : parsed.value.archiveId;
-    if (!archiveId) return json(404,{error:'legacy_dca_archive_not_found'});
-    const source = await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
+    if (!archiveId && !frozenOptions) return json(404,{error:'legacy_dca_archive_not_found'});
+    const frozen = frozenOptions ? await factorInput(url.searchParams.get('snapshotId'), 'factors.legacy.510300', legacyDcaEngine.inputSnapshotIds[0], snapshotStore) : null;
+    const source = frozenOptions ? {storageRef:frozen.storageRef,sha256:frozen.expectedSha256,archiveId:frozen.snapshot.selection.archiveId,verification:'frozen_sha256_verified'} : await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
     if (!options && parsed.value.sourceSha256 !== source.sha256) return json(409,{error:'legacy_dca_source_version_mismatch'});
     const directory = path.join(projectRoot, 'modules/factors/src');
     const {stdout,sourceHashes} = await executePinnedPython(path.join(directory,'legacy_dca_engine.py'), [source.storageRef,source.sha256,options?'options':'preview',JSON.stringify(parsed.value.parameters || {})],
       {timeout:30000,modules:['legacy_html_literals','dca_engine'].map(name=>({name,path:path.join(directory,`${name}.py`)}))});
     const run = JSON.parse(stdout);
     if (run.error) return json(run.error.includes('integrity')?409:422,{error:run.error});
-    await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
+    if (frozenOptions) await snapshotStore.verify(frozen.snapshot.snapshotId);
+    else await readLegacyDcaSource(factorLegacyArchiveRoot, archiveId);
     const {storageRef,...sourceVersion} = source;
     return json(200,{...run,sourceVersion,calculationSources:sourceHashes,
       temporalEligibility:{status:'not_point_in_time_verified',reason:'估值观测日滞后不证明披露可得时间；当日VWAP与复权份额只作旧页面假设模拟。'},
-      policy:'archived_native_replay_preview_no_config_request_result_write_no_fetch',
+      policy:'archived_native_replay_preview_no_config_request_result_write_no_fetch', readScope:frozenOptions?'frozen':'archive',
       ...(options?{archives:archives.items.filter(item=>item.assetCount>=13).map(item=>({archiveId:item.archiveId,createdAt:item.createdAt}))}:{})});
-  } catch(error) {return json(error.code==='ENOENT'?404:422,{error:error.code==='ENOENT'?'legacy_dca_archive_not_found':error.message});}
+  } catch(error) {return json(error.status || (error.code==='ENOENT'?404:422),{error:error.code==='ENOENT'?'legacy_dca_archive_not_found':error.message});}
 }
 async function customExpressionApi(url, { method, body, json, snapshotStore }) {
   try {
@@ -215,7 +220,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.4', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.5', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -236,7 +241,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
     if (url.pathname === '/api/modules/factors/v1/experiment-comparison') return factorExperimentComparison(json);
     if (url.pathname === '/api/modules/factors/v1/product-state') return factorProductState(json);
     if (url.pathname === '/api/modules/factors/v1/library') return factorLibrary(json);
-    if (['options','preview'].some(mode => url.pathname === `/api/modules/factors/v1/legacy-dca/${mode}`)) return legacyDcaApi(url, {method,body,json});
+    if (['options','frozen-options','preview'].some(mode => url.pathname === `/api/modules/factors/v1/legacy-dca/${mode}`)) return legacyDcaApi(url, {method,body,json,snapshotStore});
     if (['options','validate','preview'].some(mode => url.pathname === `/api/modules/factors/v1/custom-expression/${mode}`)) return customExpressionApi(url, {method,body,json,snapshotStore});
     if (url.pathname === '/api/modules/factors/v1/library/submissions') return factorLibrarySubmissions({ method, body, json });
     if (url.pathname.startsWith('/api/modules/factors/v1/library/submissions/')) return factorLibrarySubmission(url, { method, body, json });
@@ -531,7 +536,7 @@ async function factorFrozenSnapshots(url, { method, body, json, snapshotStore })
       if (method === 'GET' || method === 'HEAD') {
         const items = await snapshotStore.list();
         return json(200, { module: 'factors', mode: 'local_frozen_snapshot_manifests', items, count: items.length,
-          freezeOptions: factorSnapshotCandidates.filter(item => Object.hasOwn(freezeBindings, item.snapshotId)).map(item => ({ baseSnapshotId: item.snapshotId, title: item.title, assetIds: freezeBindings[item.snapshotId], selectionRequired: item.snapshotId === fundNavEngine.inputSnapshotIds[0] })),
+          freezeOptions: factorSnapshotCandidates.filter(item => Object.hasOwn(freezeBindings, item.snapshotId)).map(item => ({ baseSnapshotId: item.snapshotId, title: item.title, assetIds: freezeBindings[item.snapshotId], selectionRequired: [fundNavEngine.inputSnapshotIds[0], legacyDcaEngine.inputSnapshotIds[0]].includes(item.snapshotId) })),
           note: '列表仅读取清单；内容校验由用户手动触发或在执行前进行。冻结时间不是数据截止日期。' });
       }
       const parsed = parseJsonBody(body);
@@ -549,6 +554,7 @@ async function factorFrozenSnapshots(url, { method, body, json, snapshotStore })
 
 async function factorInput(snapshotId, assetId, baseSnapshotId, snapshotStore) {
   const asset = factorDataAssets.find(item => item.assetId === assetId);
+  if (baseSnapshotId === legacyDcaEngine.inputSnapshotIds[0] && snapshotId === baseSnapshotId) throw Object.assign(new Error('frozen_snapshot_required'), {status:422});
   if (snapshotId === baseSnapshotId) return { storageRef: asset.storageRef, snapshot: null, expectedSha256: null };
   if (!frozenSnapshotIdValid(snapshotId)) throw Object.assign(new Error('unsupported_execution_snapshot'), { status: 422 });
   const resolved = await snapshotStore.resolve(snapshotId, assetId);
@@ -1766,10 +1772,14 @@ async function factorExperimentConfig(url, { method, body, json }) {
   if (index < 0) return json(404, { error: 'experiment_config_not_found' });
   const parsed = parseJsonBody(body);
   if (parsed.error) return json(400, parsed);
+  const previous = configs.items[index];
+  if (previous.strategyTemplateId === 'strategy.legacy_510300_pe_dca' || parsed.value?.strategyTemplateId === 'strategy.legacy_510300_pe_dca') {
+    if (parsed.value?.expectedRevision !== previous.revision) return json(409,{error:'experiment_config_revision_conflict',currentRevision:previous.revision});
+    if (previous.strategyTemplateId === 'strategy.legacy_510300_pe_dca' && parsed.value?.strategyTemplateId !== previous.strategyTemplateId) return json(422,{error:'legacy_dca_config_type_change_not_supported'});
+  }
   const normalized = normalizeExperimentConfig({ ...parsed.value, configId }, { existing: configs.items, currentId: configId });
   if (normalized.error) return json(422, normalized);
   try { await customConfigCheck(normalized.item, configs); } catch (error) { return json(error.status || 500, {error:error.message}); }
-  const previous = configs.items[index];
   const item = {
     ...normalized.item,
     createdAt: previous.createdAt,
@@ -1794,7 +1804,7 @@ async function factorExecutionPlan(json) {
   const configReadiness = configs.items.map(config => {
     const missing = [];
     if (!config.snapshotId) missing.push('snapshotId');
-    if (!config.factorFamilyIds?.length && !['strategy.monthly_dca_three_bucket', 'strategy.fund_nav_fixed_dca'].includes(config.strategyTemplateId)) missing.push('factorFamilyIds');
+    if (!config.factorFamilyIds?.length && !['strategy.monthly_dca_three_bucket', 'strategy.fund_nav_fixed_dca', 'strategy.legacy_510300_pe_dca'].includes(config.strategyTemplateId)) missing.push('factorFamilyIds');
     if (!config.benchmarkId) missing.push('benchmarkId');
     if (!config.costModel) missing.push('costModel');
     if (!config.rebalanceCalendar) missing.push('rebalanceCalendar');
@@ -1842,7 +1852,7 @@ async function factorExecutionPlan(json) {
       status: item.status,
       computePolicy: item.computePolicy,
       inputSnapshotIds: item.inputSnapshotIds,
-    })), fundScreenEngine, industryEngine, threeBucketEngine, fundNavEngine, customExpressionEngine],
+    })), fundScreenEngine, industryEngine, threeBucketEngine, fundNavEngine, customExpressionEngine, legacyDcaEngine],
     configReadiness,
     runRequests: requests.items,
     notes: [
@@ -1986,6 +1996,8 @@ async function factorBacktestEngine(json) {
       reason: '旧结果封装保留为历史资产；新请求遇到不支持的配置返回422，不复用旧曲线生成结果。',
     },
     nextEngines: [
+      {engineId:'engine.factor.legacy_510300_pe_dca_v1',title:legacyDcaEngine.title,status:'active_for_guarded_frozen_archive',supportedSnapshotIds:['matching_frozen_510300_archive'],
+        calculations:['prior_pe_percentile','monthly_ladder_cashflows','pre_flow_vwap_unitization','dated_xirr'],blockers:['historical_information_availability','real_vwap_execution']},
       { engineId: 'engine.factor.custom_industry_expression_v1', title: customExpressionEngine.title, status: 'active_for_registered_bounded_industry_formulas',
         supportedSnapshotIds: customExpressionEngine.inputSnapshotIds, calculations: ['explicit_field_bindings', 'safe_ast_dependency_order', 'backward_full_windows', 'complete_case_zscore', 'immutable_revision_sha', 'prior_signal_monthly_topn'],
         blockers: ['fund_historical_factor_selection', 'point_in_time_disclosures', 'full_attribution'] },
@@ -2214,6 +2226,7 @@ async function writeFactorResultArtifacts(data) {
 
 async function buildLocalFactorResultArtifact({ request, config, existing, snapshotStore }) {
   const artifactId = makeResultArtifactId(request.requestId, existing);
+  if (config.strategyTemplateId === 'strategy.legacy_510300_pe_dca') return buildLegacyDcaResultArtifact({request, config, artifactId, snapshotStore});
   if (config.strategyTemplateId === 'strategy.custom_industry_expression') return buildIndustryResultArtifact({ request, config, artifactId, snapshotStore, custom:true });
   if (config.strategyTemplateId === 'strategy.fund_nav_fixed_dca') return buildFundNavResultArtifact({ request, config, artifactId, snapshotStore });
   if (config.strategyTemplateId === 'strategy.legacy_three_bucket_monthly') return buildThreeBucketResultArtifact({ request, config, artifactId, snapshotStore });
@@ -2226,6 +2239,28 @@ async function buildLocalFactorResultArtifact({ request, config, existing, snaps
     return buildPanelJsonFactorResultArtifact({ request, config, artifactId });
   }
   throw Object.assign(new Error('unsupported_factor_execution_config'), { status: 422 });
+}
+
+async function buildLegacyDcaResultArtifact({request, config, artifactId, snapshotStore}) {
+  if (request.requestedMode !== 'guarded_backtest' || request.artifactCandidateId !== legacyDcaEngine.artifactCandidateId) throw Object.assign(new Error('legacy_dca_requires_guarded_backtest_tool'), {status:422});
+  const input = await factorInput(config.snapshotId, 'factors.legacy.510300', legacyDcaEngine.inputSnapshotIds[0], snapshotStore);
+  const directory = path.join(projectRoot, 'modules/factors/src');
+  const {stdout, sourceHashes} = await executePinnedPython(path.join(directory, 'legacy_dca_engine.py'),
+    [input.storageRef, input.expectedSha256, 'execute', JSON.stringify(config), JSON.stringify(input.snapshot.selection)],
+    {timeout:30000, modules:['legacy_html_literals','dca_engine'].map(name=>({name,path:path.join(directory,`${name}.py`)}))});
+  const run = JSON.parse(stdout);
+  if (run.error) throw Object.assign(new Error(run.error), {status:/integrity|binding_mismatch/.test(run.error)?409:422});
+  await snapshotStore.verify(config.snapshotId);
+  const series = Object.fromEntries(['accountValue','benchmarkValue','unitNav','benchmarkNav','contributed'].map(key=>[key,run.accountLedger.map(row=>({date:row.date,value:row[key]}))]));
+  return {artifactId, module:'factors', experimentId:config.configId, requestId:request.requestId, title:config.title,
+    version:run.version, createdAt:new Date().toISOString(), status:'review_required', sourceIds:['factors.legacy.510300'],
+    storageRef:`var/factors/result-artifacts.json#${artifactId}`, executionMode:'native_workbench_legacy_510300_pe_dca_v1', computePolicy:legacyDcaEngine.computePolicy,
+    configSnapshot:{...resultConfigSnapshot(config), configRevision:config.revision}, period:run.period, metrics:run.metrics, series,
+    accountLedger:run.accountLedger, cashFlows:run.cashFlows, benchmarkCashFlows:run.benchmarkCashFlows, trades:run.trades, comparisonPolicy:run.comparisonPolicy,
+    holdings:[], sensitivity:[], warnings:run.warnings,
+    dataScope:{snapshotId:config.snapshotId, frozenSnapshot:input.snapshot, sourceVersion:{assetId:'factors.legacy.510300',sha256:input.expectedSha256,archiveId:input.snapshot.selection.archiveId},
+      calculationSources:sourceHashes, temporalEligibility:{status:'not_point_in_time_verified',reason:'归档估值观测滞后不证明披露可得时间；VWAP/复权价格为假设模拟。'},
+      limitation:'归档只冻结输入，不证明PIT/可交易性；无约束模式不同现金流不按期末财富排名；不计算因果Alpha。'} };
 }
 
 async function buildFundNavResultArtifact({ request, config, artifactId, snapshotStore }) {
@@ -2568,6 +2603,8 @@ async function buildExportedCurveFallbackResultArtifact({ request, config, artif
 function resultConfigSnapshot(config) {
   return {
     configId: config.configId,
+    strategyTemplateId: config.strategyTemplateId,
+    universe: config.universe,
     title: config.title,
     snapshotId: config.snapshotId,
     factorFamilyIds: config.factorFamilyIds,
@@ -2604,11 +2641,11 @@ function normalizeRunRequest(input, { configs, existing } = {}) {
   const errors = [];
   const configId = clean(input.configId);
   const selectedConfig = configs?.find(item => item.configId === configId);
-  const artifactCandidateId = clean(input.artifactCandidateId || (selectedConfig?.strategyTemplateId === 'strategy.custom_industry_expression' ? customExpressionEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? fundNavEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? threeBucketEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? industryEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.fund_cross_section_screen' ? fundScreenEngine.artifactCandidateId : 'artifact.factor.backtest.monthly_dca_engine'));
+  const artifactCandidateId = clean(input.artifactCandidateId || (selectedConfig?.strategyTemplateId === 'strategy.legacy_510300_pe_dca' ? legacyDcaEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.custom_industry_expression' ? customExpressionEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? fundNavEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? threeBucketEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? industryEngine.artifactCandidateId : selectedConfig?.strategyTemplateId === 'strategy.fund_cross_section_screen' ? fundScreenEngine.artifactCandidateId : 'artifact.factor.backtest.monthly_dca_engine'));
   const requestId = clean(input.requestId || makeRunRequestId(configId, existing));
   if (!validRunRequestId(requestId)) errors.push('requestId must look like run.factor_request');
   if (!selectedConfig) errors.push('configId must reference an existing experiment config');
-  if (!factorArtifactCandidates.some(item => item.artifactCandidateId === artifactCandidateId) && ![fundScreenEngine.artifactCandidateId, industryEngine.artifactCandidateId, threeBucketEngine.artifactCandidateId, fundNavEngine.artifactCandidateId, customExpressionEngine.artifactCandidateId].includes(artifactCandidateId)) errors.push('artifactCandidateId must reference a mapped factor artifact candidate');
+  if (!factorArtifactCandidates.some(item => item.artifactCandidateId === artifactCandidateId) && ![legacyDcaEngine.artifactCandidateId, fundScreenEngine.artifactCandidateId, industryEngine.artifactCandidateId, threeBucketEngine.artifactCandidateId, fundNavEngine.artifactCandidateId, customExpressionEngine.artifactCandidateId].includes(artifactCandidateId)) errors.push('artifactCandidateId must reference a mapped factor artifact candidate');
   if (existing?.some(item => item.requestId === requestId)) errors.push('requestId already exists');
   if (errors.length) return { error: 'validation_failed', errors };
   return {
@@ -3031,7 +3068,7 @@ function normalizeExperimentConfig(input, { existing, currentId } = {}) {
   if (!validConfigId(configId)) errors.push('configId must look like config.my_experiment');
   if (!title) errors.push('title is required');
   if (!snapshotId) errors.push('snapshotId is required');
-  if (!factorFamilyIds.length && !['strategy.monthly_dca_three_bucket', 'strategy.fund_nav_fixed_dca'].includes(input.strategyTemplateId)) errors.push('at least one factorFamilyId is required');
+  if (!factorFamilyIds.length && !['strategy.monthly_dca_three_bucket', 'strategy.fund_nav_fixed_dca', 'strategy.legacy_510300_pe_dca'].includes(input.strategyTemplateId)) errors.push('at least one factorFamilyId is required');
   if (!benchmarkId) errors.push('benchmarkId is required');
   if (!portfolioRule) errors.push('portfolioRule is required');
   if (!rebalanceCalendar) errors.push('rebalanceCalendar is required');

@@ -56,6 +56,11 @@ export function accountModeSeries(ledger, mode) {
 }
 
 export function effectiveCosts(config) {
+  if (config?.strategyTemplateId === 'strategy.legacy_510300_pe_dca') {
+    const p = config.strategySettings?.parameters;
+    if (!p || !['fee','slippage','cashRate'].every(key=>Number.isFinite(p[key]))) return null;
+    return {costModel:config.costModel,fee:p.fee,slippage:p.slippage,cashRate:p.cashRate};
+  }
   if (config?.strategyTemplateId !== 'strategy.legacy_three_bucket_monthly') return { costModel: config?.costModel };
   const settings = config.strategySettings;
   if (!settings || !['broadAnnualFee','sectorAnnualFee'].every(key => Number.isFinite(settings[key]) && settings[key] >= 0 && settings[key] <= .2)) return null;
@@ -68,10 +73,13 @@ export function resultComparisonKey(item) {
   const sources = scope.sourceVersions || (scope.sourceVersion ? [scope.sourceVersion] : []);
   if (!sources.length || sources.some(row => !/^[a-f0-9]{64}$/.test(row.sha256 || ''))) return null;
   const costs = effectiveCosts(config); if (!costs) return null;
+  if (config.strategyTemplateId === 'strategy.legacy_510300_pe_dca' && !Array.isArray(item.benchmarkCashFlows)) return null;
   return JSON.stringify({ snapshotId: config.snapshotId, benchmarkId: config.benchmarkId, costs,
     rebalanceCalendar: config.rebalanceCalendar, universe: config.universe,
+    ...(config.strategyTemplateId === 'strategy.legacy_510300_pe_dca' ? {purchaseDay:config.strategySettings?.parameters?.nth,contributionMode:config.strategySettings?.parameters?.mode} : {}),
     transactionSettings: config.transactionSettings || null,
     cashFlows: (item.cashFlows || []).map(row => [row.date,row.amount]),
+    benchmarkCashFlows: (item.benchmarkCashFlows || item.cashFlows || []).map(row=>[row.date,row.amount]),
     sources: sources.map(row => [row.assetId || row.sourceId || '', row.sha256]).sort((a,b)=>a[0].localeCompare(b[0])) });
 }
 

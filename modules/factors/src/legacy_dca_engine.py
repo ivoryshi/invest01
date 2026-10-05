@@ -108,6 +108,32 @@ def signal(pe, date, key, years):
             'percentile': sum(v <= current for v in values) / len(values), 'observations': len(values)}
 
 
+def validate_config(config, expected_sha, selection):
+    settings = config.get('strategySettings', {})
+    if not isinstance(settings, dict) or set(settings) != {'archiveId', 'sourceSha256', 'parameters'}:
+        raise ValueError('legacy_dca_bound_config_required')
+    if settings['sourceSha256'] != expected_sha or selection != {k: settings[k] for k in ['archiveId', 'sourceSha256']}:
+        raise ValueError('legacy_dca_frozen_source_binding_mismatch')
+    p = settings['parameters']
+    validate(p)
+    cost = config.get('costModel', '')
+    match = re.fullmatch(r'commission=([0-9.eE+-]+);slippage=([0-9.eE+-]+)', cost) if isinstance(cost, str) else None
+    if not match or float(match[1]) != p['fee'] or float(match[2]) != p['slippage']:
+        raise ValueError('legacy_dca_cost_binding_mismatch')
+    if config.get('strategyTemplateId') != 'strategy.legacy_510300_pe_dca' or config.get('benchmarkId') != '510300_fixed_dca_vwap' \
+            or config.get('universe') != 'archived_510300_adjusted_vwap' or config.get('rebalanceCalendar') != 'monthly' \
+            or config.get('portfolioRule') != 'pe_ladder_monthly_dca' \
+            or config.get('factorFamilyIds') or config.get('factorWeights') or config.get('transactionSettings'):
+        raise ValueError('legacy_dca_unsupported_config_semantics')
+    return p
+
+
+def validate_period(base, p):
+    months = sorted({str(date)[:6] for date in base['D']})
+    if len(months) < 2 or p['startMonth'].replace('-', '') < months[1] or p['endMonth'].replace('-', '') > months[-1]:
+        raise ValueError('legacy_dca_period_outside_full_month_start_coverage')
+
+
 def replay(base, pe, p):
     validate(p)
     dates = base['D']; months = {}
@@ -181,7 +207,7 @@ def replay(base, pe, p):
             peak=max(peak,row['unitNav']);drawdown=min(drawdown,row['unitNav']/peak-1)
     metrics['maxDrawdown'] = drawdown if contributed else None
     return {'version':VERSION,'parameters':p,'period':[rows[0]['date'],rows[-1]['date']], 'metrics':metrics,
-            'accountLedger':rows,'cashFlows':cashflows,'trades':trades,
+            'accountLedger':rows,'cashFlows':cashflows,'benchmarkCashFlows':[{'date':date.isoformat(),'amount':-amount} for date,amount in baseline_flows],'trades':trades,
             'comparisonPolicy':'same_committed_cashflow_pool' if p['mode']=='pool' else 'different_cashflows_use_separate_xirr_no_wealth_ranking',
             'warnings':['archived_vwap_and_back_adjusted_units_not_real_execution','pe_observation_lag_not_point_in_time_verification',
                         'whole_month_tape_coverage_not_exchange_calendar_proof','xirr_reuses_existing_solver_bounds_minus_95pct_to_300pct',
@@ -194,8 +220,18 @@ if __name__ == '__main__':
         raw = Path(sys.argv[1]).read_bytes()
         if hashlib.sha256(raw).hexdigest() != sys.argv[2]: raise ValueError('legacy_archive_integrity_failed')
         base, pe = load(raw)
-        result = {'version':VERSION,'defaults':DEFAULTS,'pricePeriod':[as_date(base['D'][0]).isoformat(),as_date(base['D'][-1]).isoformat()],
-                  'priceObservations':len(base['D']),'peObservations':len(pe['D'])} if sys.argv[3] == 'options' else replay(base,pe,json.loads(sys.argv[4]))
+        mode = sys.argv[3]
+        if mode == 'options':
+            result = {'version':VERSION,'defaults':DEFAULTS,'pricePeriod':[as_date(base['D'][0]).isoformat(),as_date(base['D'][-1]).isoformat()],
+                      'priceObservations':len(base['D']),'peObservations':len(pe['D'])}
+        elif mode == 'execute':
+            config = json.loads(sys.argv[4])
+            p = validate_config(config, sys.argv[2], json.loads(sys.argv[5]))
+            result = replay(base, pe, p)
+        elif mode == 'preview':
+            result = replay(base, pe, json.loads(sys.argv[4]))
+        else:
+            raise ValueError('legacy_dca_unsupported_mode')
         if hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest() != sys.argv[2]: raise ValueError('legacy_archive_integrity_failed')
     except (ValueError, TypeError, KeyError, OSError, IndexError) as error:
         result = {'error':str(error)}

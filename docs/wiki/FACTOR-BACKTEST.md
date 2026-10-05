@@ -1,6 +1,6 @@
 # 回测工具与 Skill
 
-v0.5.3 / 因子V0.20。复用已有执行器和snapshot/config/request/result链路，不运行旧脚本，不新增依赖。入口为因子页的回测工具区域、项目内[Skill](../../.agents/skills/factor-backtest/SKILL.md)及本地CLI。Skill随仓库分发，不安装到全局目录。返回[Wiki](README.md) / [因子模块](../../modules/factors/README.md)。
+v0.5.5 / 因子V0.22。复用已有执行器和snapshot/config/request/result链路，不运行旧脚本，不新增依赖。入口为因子页的回测工具区域、项目内[Skill](../../.agents/skills/factor-backtest/SKILL.md)及本地CLI。Skill随仓库分发，不安装到全局目录。返回[Wiki](README.md) / [因子模块](../../modules/factors/README.md)。
 
 ## 支持范围
 
@@ -11,8 +11,11 @@ v0.5.3 / 因子V0.20。复用已有执行器和snapshot/config/request/result链
 | strategy.custom_industry_expression | 注册白名单公式行业TopN | 同上，配置绑定程序revision/SHA |
 | strategy.legacy_three_bucket_monthly | A/B/C三档月度定投 | 八文件执行包 |
 | strategy.monthly_dca_three_bucket | 固定宽基定投 | broad文件 |
+| strategy.legacy_510300_pe_dca | 510300 PE分位档位定投 | 明确归档ID/SHA的安全HTML数据副本 |
 
 基金最新横截面筛选、旧panel.json兼容执行和旧导出回放不属于此受保护历史工具。相关旧入口保留，但不被Skill调用或包装为新历史结果。
+
+510300原生表单选择归档后显式冻结，再保存/修改正式配置；从统一回测工具选择该配置、只读预检、双确认后执行。预览仍只读，不自动入库。正式结果保存完整参数/revision、归档/SHA、冻结清单、计算源码与工作流凭证、全账本/现金流/交易和分别计算的XIRR，进入标准请求/结果查询、对比、导出及结构审计。未知基准、费用字符串与实际参数不符、错误归档绑定、过期凭证或缺确认拒绝；PE不能经旧手工execute入口执行。配置保存本身不保证可计算，必须预检并核对结果；未PIT与VWAP假设不因正式入库消失。
 
 所有策略当前只允许`assumption_simulation`：代理指数/复权净值不是实际成交或申赎确认，冻结不证明PIT。`point_in_time_verified`可用于预检要求，但当前返回`historical_information_availability_not_verified`，禁止执行，不能自动降级。最新基金属性不能用来历史选基；观察日期、披露可得日期、导入/冻结日期必须分开。详见[数据时点协议](FACTOR-DATA.md)中的“数据时点与比较”。
 

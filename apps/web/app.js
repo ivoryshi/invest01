@@ -543,6 +543,7 @@ let editFundNavConfig = null;
 let refreshFundNavSnapshotChoices = null;
 let refreshFrozenSnapshotList = null;
 let refreshBacktestTools = null;
+let editLegacyDcaConfig = null;
 let editExpressionFactor = null;
 let editExpressionConfig = null;
 
@@ -1078,9 +1079,19 @@ async function legacyDcaReplayPanel() {
   const reset=element('button','恢复归档默认参数');reset.type='button';box.append(reset);
   const download=element('button','下载参数 JSON');download.type='button';box.append(download);
   const upload=field('parameterFile','参数文件','file');upload.accept='.json,application/json';
-  let source=null,defaults=null,generation=0,busy=false;
+  const saved=field('savedPeConfig','已保存PE配置','select'), configId=field('peConfigId','配置ID','text'), configTitle=field('peConfigTitle','配置名称','text');
+  saved.required=false;configId.required=configTitle.required=false;
+  const freeze=element('button','冻结当前归档版本'),save=element('button','保存正式配置');freeze.type=save.type='button';box.append(freeze,save);
+  const originals=element('button','重新选择归档原件');originals.type='button';box.append(originals);originals.addEventListener('click',()=>{if(!busy)load();});
+  let source=null,defaults=null,generation=0,busy=false,frozenId=null,editingId=null,editingRevision=null,loadedConfig=null,sourceIsFrozen=false,savedConfigs=[];
+  function resetConfig(){frozenId=null;editingId=null;editingRevision=null;loadedConfig=null;configId.disabled=false;configId.value=`config.pe_510300_${Date.now()}`;configTitle.value='510300 PE定投';saved.value='';}
+  async function api(url,body,method='POST') {
+    const response=await fetch(url,body===undefined?undefined:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),data=await response.json();
+    if(!response.ok)throw new Error(data.errors?.join('；')||data.error||'PE配置操作失败');return data;
+  }
+  async function refreshSaved(){const data=await api('/api/modules/factors/v1/experiment-configs');savedConfigs=data.items.filter(x=>x.strategyTemplateId==='strategy.legacy_510300_pe_dca');saved.replaceChildren(option('','新建配置'));savedConfigs.forEach(x=>saved.append(option(x.configId,`${x.title} · revision ${x.revision}`)));saved.value=editingId||'';}
   function fill(p) {
-    for(const key of Object.keys(inputs).filter(key=>!['archiveId','parameterFile'].includes(key))) {if(key==='timingEnabled')inputs[key].checked=p[key];else inputs[key].value=p[key];}
+    for(const key of Object.keys(defaults).filter(key=>key!=='ladder')) {if(key==='timingEnabled')inputs[key].checked=p[key];else inputs[key].value=p[key];}
     ladder.replaceChildren(element('h3','分位档位与投入倍数'));ladderInputs=[];
     for(const bucket of p.ladder){const row=element('label','分位上界（%）'),hi=document.createElement('input'),multiple=document.createElement('input');hi.type=multiple.type='number';hi.min='0';hi.max='100';hi.step='1';hi.value=bucket.hi;multiple.min='0';multiple.max='10';multiple.step='.05';multiple.value=bucket.multiple;hi.setAttribute('aria-label',`分位上界 ${bucket.hi}`);multiple.setAttribute('aria-label',`分位 ${bucket.hi} 投入倍数`);row.append(hi,element('span','投入倍数'),multiple);ladder.append(row);ladderInputs.push({hi,multiple});}
     result.replaceChildren();message.textContent='';
@@ -1091,13 +1102,49 @@ async function legacyDcaReplayPanel() {
     try {
       const response=await fetch('/api/modules/factors/v1/legacy-dca/options'+(id?'?'+new URLSearchParams({archiveId:id}):'')),data=await response.json();
       if(token!==generation)return;if(!response.ok)throw new Error(data.error || '归档行情不可用');
-      source=data.sourceVersion;defaults=data.defaults;inputs.archiveId.replaceChildren();data.archives.forEach(a=>inputs.archiveId.append(option(a.archiveId,`${a.createdAt} · ${a.archiveId.slice(0,12)}`)));inputs.archiveId.value=source.archiveId;fill(defaults);
+      source=data.sourceVersion;sourceIsFrozen=false;freeze.disabled=false;defaults=data.defaults;inputs.archiveId.replaceChildren();data.archives.forEach(a=>inputs.archiveId.append(option(a.archiveId,`${a.createdAt} · ${a.archiveId.slice(0,12)}`)));inputs.archiveId.value=source.archiveId;fill(defaults);resetConfig();
       message.textContent=`510300 · ${data.pricePeriod.join(' → ')} · ${data.priceObservations}行情观测 / ${data.peObservations}估值观测 · ${source.sha256}`;
     } catch(error){if(token===generation){source=null;message.textContent=error.message;}}
     finally{if(token===generation){busy=false;box.disabled=false;run.disabled=!source;}}
   }
   inputs.archiveId.addEventListener('change',()=>load(inputs.archiveId.value));
-  form.addEventListener('change',event=>{if(event.target!==inputs.archiveId&&event.target!==upload){generation++;result.replaceChildren();}});
+  editLegacyDcaConfig=async item=>{
+    if(busy)return;if(!item.configId){const retained=sourceIsFrozen?frozenId:null;resetConfig();frozenId=retained;return;}
+    const token=++generation;busy=true;box.disabled=true;
+    try{
+      const selected=(await api(`/api/modules/factors/v1/experiment-configs/${encodeURIComponent(item.configId)}`)).item;
+      if(selected.strategyTemplateId!=='strategy.legacy_510300_pe_dca')throw new Error('不是PE定投配置');
+      const data=await api('/api/modules/factors/v1/legacy-dca/frozen-options?'+new URLSearchParams({snapshotId:selected.snapshotId}));
+      if(token!==generation)return;
+      if(data.sourceVersion.archiveId!==selected.strategySettings.archiveId||data.sourceVersion.sha256!==selected.strategySettings.sourceSha256)throw new Error('冻结数据与配置绑定不一致');
+      source=data.sourceVersion;defaults=data.defaults;sourceIsFrozen=true;freeze.disabled=run.disabled=true;
+      if(![...inputs.archiveId.children].some(x=>x.value===source.archiveId))inputs.archiveId.append(option(source.archiveId,`${source.archiveId.slice(0,12)} · 已冻结`));
+      inputs.archiveId.value=source.archiveId;fill(selected.strategySettings.parameters);frozenId=selected.snapshotId;editingId=selected.configId;editingRevision=selected.revision;loadedConfig=selected;
+      configId.value=editingId;configId.disabled=true;configTitle.value=selected.title;saved.value=editingId;
+      message.textContent=`已载入正式配置 · revision ${editingRevision} · ${frozenId} · 冻结编辑不依赖原件，归档预览需重新选择原件版本`;
+      panel.scrollIntoView?.({block:'start',behavior:'smooth'});
+    }catch(error){if(token===generation){source=null;message.textContent=error.message;}}
+    finally{if(token===generation){busy=false;box.disabled=false;}}
+  };
+  saved.addEventListener('change',()=>editLegacyDcaConfig({configId:saved.value}));
+  freeze.addEventListener('click',async()=>{
+    if(busy||!source||sourceIsFrozen)return;busy=true;box.disabled=true;
+    try{const data=await api('/api/modules/factors/v1/snapshots/frozen',{baseSnapshotId:'snapshot.legacy.510300.archive',title:configTitle.value||'510300归档',selection:{archiveId:source.archiveId,sourceSha256:source.sha256}});frozenId=data.snapshotId;message.textContent=`归档已冻结 · ${frozenId} · 尚未执行回测`;}
+    catch(error){message.textContent=error.message;}finally{busy=false;box.disabled=false;}
+  });
+  save.addEventListener('click',async()=>{
+    if(busy||!source)return;if(!frozenId){message.textContent='请先冻结选定归档版本。';return;}busy=true;box.disabled=true;
+    try{
+      const p=parameters(),config={...(loadedConfig||{}),...(editingId?{expectedRevision:editingRevision}:{}),configId:configId.value,title:configTitle.value,strategyTemplateId:'strategy.legacy_510300_pe_dca',snapshotId:frozenId,
+        factorFamilyIds:[],factorWeights:[],benchmarkId:'510300_fixed_dca_vwap',universe:'archived_510300_adjusted_vwap',portfolioRule:'pe_ladder_monthly_dca',rebalanceCalendar:'monthly',
+        costModel:`commission=${p.fee};slippage=${p.slippage}`,strategySettings:{archiveId:source.archiveId,sourceSha256:source.sha256,parameters:p},transactionSettings:{},
+        comparisonLimits:[...new Set([...(loadedConfig?.comparisonLimits||[]),'not_point_in_time_verified','free_mode_different_cashflows_no_wealth_ranking'])]};
+      const data=await api('/api/modules/factors/v1/experiment-configs'+(editingId?`/${encodeURIComponent(editingId)}`:''),config,editingId?'PUT':'POST');
+      editingId=data.item.configId;editingRevision=data.item.revision;loadedConfig=data.item;configId.disabled=true;await refreshSaved();message.textContent=`正式配置已保存 · revision ${data.item.revision} · 未执行回测`;
+      await refreshBacktestTools?.();await refreshFactorExecution?.();
+    }catch(error){message.textContent=error.message;}finally{busy=false;box.disabled=false;}
+  });
+  form.addEventListener('change',event=>{if(event.target!==inputs.archiveId&&event.target!==upload&&event.target!==saved){generation++;result.replaceChildren();}});
   reset.addEventListener('click',()=>{if(!busy&&defaults){generation++;fill(defaults);}});
   download.addEventListener('click',()=>{if(source&&!busy)downloadFactorFile(JSON.stringify({archiveId:source.archiveId,sourceSha256:source.sha256,parameters:parameters()},null,2),'application/json','510300-replay-parameters.json');});
   upload.addEventListener('change',async()=>{
@@ -1106,7 +1153,7 @@ async function legacyDcaReplayPanel() {
     catch(error){if(token===generation)message.textContent=error.message;}finally{if(token===generation){busy=false;box.disabled=false;}}
   });
   form.addEventListener('submit',async event=>{
-    event.preventDefault();if(busy||!source)return;const token=++generation,p=parameters();busy=true;box.disabled=true;result.replaceChildren();
+    event.preventDefault();if(busy||!source||sourceIsFrozen)return;const token=++generation,p=parameters();busy=true;box.disabled=true;result.replaceChildren();
     try{
       const response=await fetch('/api/modules/factors/v1/legacy-dca/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({archiveId:source.archiveId,sourceSha256:source.sha256,parameters:p})}),data=await response.json();
       if(token!==generation)return;if(!response.ok)throw new Error(data.error || '复算失败');
@@ -1133,7 +1180,7 @@ async function legacyDcaReplayPanel() {
       result.append(exports,element('p',`${data.temporalEligibility.status} · 当日VWAP与复权份额为归档模拟；MA为全行情历史移动均值，买入/停投标记来自本次实际计划。无约束模式按实际倍数投入，不保留旧负现金借贷口径。净值按投入前未滑点复权VWAP单位化，非昨日账户价值加存款近似。`,'warning'));
     }catch(error){if(token===generation)message.textContent=error.message;}finally{if(token===generation){busy=false;box.disabled=false;}}
   });
-  await load();return panel;
+  await load();try{await refreshSaved();}catch(error){message.textContent=error.message;}return panel;
 }
 
 async function customExpressionPanel() {
@@ -2909,7 +2956,7 @@ async function executionPlanPanel() {
     resultDetail.append(
       element('p', `${item.artifactId} · ${item.executionMode} · ${item.computePolicy}`, 'next'),
       resultMetricGrid(item.metrics),
-      resultDiagnosticTable('归因诊断', ['因子', '类型', '权重', '单因子超额', '边际贡献'], (item.attribution.factorDiagnostics || []).map(row => [
+      resultDiagnosticTable('归因诊断', ['因子', '类型', '权重', '单因子超额', '边际贡献'], (item.attribution?.factorDiagnostics || []).map(row => [
         row.label || row.title || row.factorKey,
         row.kind,
         fmtPct(row.configuredWeight, 1),
@@ -2997,12 +3044,17 @@ async function executionPlanPanel() {
     }
     if (item.cashFlows?.length && !item.sleeveMetrics?.length) {
       resultDetail.append(resultDiagnosticTable('现金流明细', ['计划日期', '数据执行日期', '投入金额', '买入成本', '基准买入成本', '现金分配'], item.cashFlows.map(row => [
-        row.scheduledDates.join(' / '), row.date, fmtNum(row.amount, 2), fmtNum(row.buyCost, 2), fmtNum(row.benchmarkBuyCost, 2), fmtNum(row.cashAllocation, 2),
+        row.scheduledDates?.join(' / ') || row.date, row.date, fmtNum(row.amount, 2), fmtNum(row.buyCost, 2), fmtNum(row.benchmarkBuyCost, 2), fmtNum(row.cashAllocation, 2),
       ])));
       if (item.pendingContributions?.length) resultDetail.append(resultDiagnosticTable('期内未能执行的计划投入', ['计划日期', '计划金额', '状态'], item.pendingContributions.map(row => [row.scheduledDate, fmtNum(row.amount, 2), '区间内无可用数据日期，未计入累计投入'])));
       resultDetail.append(resultDiagnosticTable('最近30个数据日账户账本', ['日期', '账户价值', '基准价值', '累计投入', '时间加权净值', '现金余额'], (item.accountLedger || []).slice(-30).map(row => [
         row.date, fmtNum(row.accountValue, 2), fmtNum(row.benchmarkValue, 2), fmtNum(row.contributed, 2), fmtNum(row.unitNav, 4), fmtNum(row.cash, 2),
       ])));
+    }
+    if (item.executionMode === 'native_workbench_legacy_510300_pe_dca_v1') {
+      const trades=factorRecordBrowser('PE正式交易记录',row=>resultDiagnosticTable(row.date,['状态','信号日','PE分位','倍数','实际投入','买入预算','余额'],[[row.status,row.signalDate,fmtPct(row.percentile),row.multiple,fmtNum(row.deposit,2),fmtNum(row.spend,2),fmtNum(row.cash,2)]]));
+      trades.setItems(item.trades.map(row=>({...row,title:row.date})));resultDetail.append(trades.node,
+        element('p',`归档 ${item.dataScope.sourceVersion.archiveId} · ${item.comparisonPolicy} · 基准累计投入 ${fmtNum(item.metrics.benchmarkContributed,2)}`,'warning'));
     }
     const checklist = element('section', null, 'result-review-list');
     checklist.append(element('h4', '复核清单'));
@@ -3029,7 +3081,7 @@ async function executionPlanPanel() {
     for (const [label, value] of [
       ['TWR年化', fmtPct(metrics.annualizedReturn)],
       ['账户IRR', fmtPct(metrics.moneyWeightedIrr)],
-      [metrics.benchmarkAnnualizedReturn !== undefined ? '基准TWR年化' : '基准IRR', fmtPct(metrics.benchmarkAnnualizedReturn ?? metrics.benchmarkIrr)],
+      [metrics.benchmarkAnnualizedReturn !== undefined ? '基准TWR年化' : '基准IRR', fmtPct(metrics.benchmarkAnnualizedReturn ?? metrics.benchmarkIrr ?? metrics.benchmarkMoneyWeightedIrr)],
       ['超额', fmtPct(metrics.excessAnnualizedReturn ?? metrics.excessIrr)],
       ['回撤', fmtPct(metrics.maxDrawdown)],
       ['波动', fmtPct(metrics.volatility)],
@@ -3312,7 +3364,7 @@ async function experimentConfigPanel(library) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = isDraft ? '修改' : '套用模板';
-      button.addEventListener('click', () => item.strategyTemplateId === 'strategy.custom_industry_expression' ? editExpressionConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? editFundNavConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? editThreeBucketConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? editIndustryConfig?.({ ...item, configId: isDraft ? item.configId : '' }) : fillConfig({ ...item, configId: isDraft ? item.configId : '' }));
+      button.addEventListener('click', () => item.strategyTemplateId === 'strategy.legacy_510300_pe_dca' ? editLegacyDcaConfig?.({configId:item.configId}) : item.strategyTemplateId === 'strategy.custom_industry_expression' ? editExpressionConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? editFundNavConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? editThreeBucketConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? editIndustryConfig?.({ ...item, configId: isDraft ? item.configId : '' }) : fillConfig({ ...item, configId: isDraft ? item.configId : '' }));
       card.append(button);
       saved.append(card);
     }
@@ -3460,7 +3512,7 @@ try {
   async function render() {
     if (cleanup) cleanup();
     cleanup = null;
-    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editExpressionFactor = null; editExpressionConfig = null;
+    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editLegacyDcaConfig = null; editExpressionFactor = null; editExpressionConfig = null;
     const selected = items.find(item => item.id === location.hash.slice(1)) || items[0];
     for (const a of nav.children) {
       if (a.hash === `#${selected.id}`) a.setAttribute('aria-current', 'page');

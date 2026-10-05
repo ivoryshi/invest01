@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import { accountModeSeries, compareCurves, csvText, resultComparisonKey } from '../apps/web/factor-analysis.js';
 
 const p = (date,value) => ({date,value});
+test('PE comparison binds fees cash interest purchase day mode and actual contribution schedule',()=>{
+  const item={configSnapshot:{snapshotId:'frozen',benchmarkId:'510300_fixed_dca_vwap',strategyTemplateId:'strategy.legacy_510300_pe_dca',costModel:'commission=.0001;slippage=.0005',
+    strategySettings:{parameters:{fee:.0001,slippage:.0005,cashRate:.02,nth:1,mode:'pool'}}},dataScope:{sourceVersion:{sha256:'a'.repeat(64)}},
+    accountLedger:[{date:'2026-05-01'}],cashFlows:[{date:'2026-05-01',amount:100}],benchmarkCashFlows:[{date:'2026-05-01',amount:100}]};
+  const first=resultComparisonKey(item);assert.ok(first);
+  for(const [key,value]of [['fee',.001],['slippage',.001],['cashRate',.03],['nth',-1],['mode','free']]){
+    const next=structuredClone(item);next.configSnapshot.strategySettings.parameters[key]=value;assert.notEqual(resultComparisonKey(next),first);
+  }
+  const missing=structuredClone(item);delete missing.configSnapshot.strategySettings.parameters;assert.equal(resultComparisonKey(missing),null);
+});
 test('comparison uses one valid calendar window and normalized NAV, not cashflow IRR',()=>{
   const series={a:[p('2020-01-01',null),p('2021-01-01',2),p('2022-01-01',3)],b:[p('2020-01-01',1),p('2021-01-01',4),p('2022-01-01',6)]};
   const result=compareCurves(series,['a','b'],'b');assert.equal(result.status,'common_period_normalized_nav_only');

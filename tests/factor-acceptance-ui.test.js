@@ -89,3 +89,19 @@ test('late result detail cannot overwrite a later selection or empty result libr
   ctx.selectedResultId='result.old';const pending=ctx.renderResultDetail();ctx.selectedResultId=null;await ctx.renderResultDetail();finish();await pending;
   assert.ok(walk(detail).some(n=>n.textContent==='还没有可查看的结果资产。'));
 });
+test('formal PE detail renders ledger trades and missing attribution without throwing',async()=>{
+  const body=source.slice(source.indexOf('  async function renderResultDetail()'),source.indexOf('  function resultMetricGrid('));
+  const detail=element('section');
+  const item={artifactId:'result.pe',executionMode:'native_workbench_legacy_510300_pe_dca_v1',metrics:{benchmarkContributed:100},
+    cashFlows:[{date:'2026-05-01',amount:100}],accountLedger:[{date:'2026-05-01',accountValue:100}],
+    trades:[{date:'2026-05-01',status:'buy',deposit:100,spend:100}],warnings:['not_point_in_time_verified'],
+    dataScope:{sourceVersion:{archiveId:'archive',sha256:'sha'}},comparisonPolicy:'different_cashflows_use_separate_xirr_no_wealth_ranking'};
+  const ctx=vm.createContext({selectedResultId:'result.pe',detailGeneration:0,resultDetail:detail,element,encodeURIComponent,
+    fmtPct:String,fmtNum:String,resultExportPanel:()=>element('exports'),industryAttributionPanel:()=>null,cashflowAttributionPanel:()=>null,proxyRiskPanel:()=>null,
+    resultMetricGrid:()=>element('metrics'),resultDiagnosticTable:(title)=>element('table',title),
+    factorRecordBrowser:(label)=>({node:element('browser',label),setItems:()=>{}}),
+    fetch:async()=>({ok:true,json:async()=>({item,reviewChecklist:[]})})});
+  vm.runInContext(body,ctx);await ctx.renderResultDetail();
+  assert.ok(walk(detail).some(n=>n.textContent==='PE正式交易记录'));
+  assert.ok(walk(detail).some(n=>n.textContent?.includes('different_cashflows_use_separate_xirr')));
+});
