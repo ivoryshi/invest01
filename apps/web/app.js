@@ -544,6 +544,7 @@ let refreshFundNavSnapshotChoices = null;
 let refreshFrozenSnapshotList = null;
 let refreshBacktestTools = null;
 let editLegacyDcaConfig = null;
+let editDcaConfig = null;
 let editExpressionFactor = null;
 let editExpressionConfig = null;
 
@@ -2232,7 +2233,7 @@ async function strategyConfigWorkbenchPanel(library) {
       if (item.strategyTemplateId === 'strategy.monthly_dca_three_bucket') {
         const edit = element('button', '编辑定投配置');
         edit.type = 'button';
-        edit.addEventListener('click', () => fillDcaConfig(item));
+        edit.addEventListener('click', () => editDcaConfig?.({ configId: item.configId }));
         card.append(edit);
       }
       saved.append(card);
@@ -2429,6 +2430,22 @@ async function strategyConfigWorkbenchPanel(library) {
     updateDcaSummary();
     dcaForm.scrollIntoView({ block: 'start' });
   }
+  let dcaEditGeneration = 0;
+  editDcaConfig = async item => {
+    const sent = ++dcaEditGeneration;
+    try {
+      const response = await fetch('/api/modules/factors/v1/experiment-configs');
+      const latest = await response.json();
+      if (!panel.isConnected || sent !== dcaEditGeneration) return;
+      if (!response.ok) throw new Error(latest.error || '读取定投配置失败');
+      const selected = latest.items.find(row => row.configId === item.configId);
+      if (selected?.strategyTemplateId !== 'strategy.monthly_dca_three_bucket') throw new Error('定投配置不存在或类型不匹配');
+      configs = latest;
+      fillDcaConfig(selected);
+    } catch (error) {
+      if (panel.isConnected && sent === dcaEditGeneration) dcaForm.querySelector('.form-message').textContent = error.message;
+    }
+  };
   function updateDcaSummary() {
     for (const name of ['bucketA', 'bucketB', 'bucketC']) dcaForm.elements[name].nextElementSibling.textContent = `${dcaForm.elements[name].value}%`;
     const total = ['bucketA', 'bucketB', 'bucketC'].reduce((sum, name) => sum + Number(dcaForm.elements[name].value), 0);
@@ -3364,7 +3381,7 @@ async function experimentConfigPanel(library) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = isDraft ? '修改' : '套用模板';
-      button.addEventListener('click', () => item.strategyTemplateId === 'strategy.legacy_510300_pe_dca' ? editLegacyDcaConfig?.({configId:item.configId}) : item.strategyTemplateId === 'strategy.custom_industry_expression' ? editExpressionConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? editFundNavConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? editThreeBucketConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? editIndustryConfig?.({ ...item, configId: isDraft ? item.configId : '' }) : fillConfig({ ...item, configId: isDraft ? item.configId : '' }));
+      button.addEventListener('click', () => item.strategyTemplateId === 'strategy.legacy_510300_pe_dca' ? editLegacyDcaConfig?.({configId:item.configId}) : item.strategyTemplateId === 'strategy.monthly_dca_three_bucket' && isDraft ? editDcaConfig?.({configId:item.configId}) : item.strategyTemplateId === 'strategy.custom_industry_expression' ? editExpressionConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.fund_nav_fixed_dca' ? editFundNavConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.legacy_three_bucket_monthly' ? editThreeBucketConfig?.({ configId: isDraft ? item.configId : '' }) : item.strategyTemplateId === 'strategy.industry_parquet_monthly_topn' ? editIndustryConfig?.({ ...item, configId: isDraft ? item.configId : '' }) : fillConfig({ ...item, configId: isDraft ? item.configId : '' }));
       card.append(button);
       saved.append(card);
     }
@@ -3512,7 +3529,7 @@ try {
   async function render() {
     if (cleanup) cleanup();
     cleanup = null;
-    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editLegacyDcaConfig = null; editExpressionFactor = null; editExpressionConfig = null;
+    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editLegacyDcaConfig = null; editDcaConfig = null; editExpressionFactor = null; editExpressionConfig = null;
     const selected = items.find(item => item.id === location.hash.slice(1)) || items[0];
     for (const a of nav.children) {
       if (a.hash === `#${selected.id}`) a.setAttribute('aria-current', 'page');

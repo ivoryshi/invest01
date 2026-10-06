@@ -61,13 +61,32 @@ test('frozen PE configuration loads latest revision and preserves metadata witho
   f.update(c=>({...c,revision:9,title:'Latest outside edit'}));await f.edit('config.frozen_only');
   assert.equal(f.field('peConfigTitle').value,'Latest outside edit');await f.button('保存正式配置').fire('click');assert.equal(f.posts.at(-1).body.expectedRevision,9);
 });
-test('configuration library modify routes PE to its dedicated editor, not generic factor form',async()=>{
+for (const [strategy, editor] of [['strategy.legacy_510300_pe_dca','editLegacyDcaConfig'],['strategy.monthly_dca_three_bucket','editDcaConfig']]) test(`configuration library routes ${strategy} to its dedicated editor`,async()=>{
   const start=source.lastIndexOf('  function renderConfigs()');
   const render=source.slice(start,source.indexOf('  picker.addEventListener(',start));
   let selected=null;const cards=new Node('section');
-  const ctx=vm.createContext({saved:cards,configs:{templates:[],items:[{configId:'config.pe',strategyTemplateId:'strategy.legacy_510300_pe_dca',title:'PE'}]},
-    element:(tag,text)=>Object.assign(new Node(tag),{textContent:text}),document:{createElement:tag=>new Node(tag)},editLegacyDcaConfig:item=>{selected=item.configId;},fillConfig:()=>{throw Error('generic form must not receive PE');}});
+  const ctx=vm.createContext({saved:cards,configs:{templates:[],items:[{configId:'config.pe',strategyTemplateId:strategy,title:'DCA'}]},
+    element:(tag,text)=>Object.assign(new Node(tag),{textContent:text}),document:{createElement:tag=>new Node(tag)},[editor]:item=>{selected=item.configId;},fillConfig:()=>{throw Error('generic form must not receive executable DCA');}});
   vm.runInContext(render,ctx);ctx.renderConfigs();await descendants(cards).find(n=>n.tag==='button').fire('click');assert.equal(selected,'config.pe');
+});
+const dcaEditor=source.slice(source.indexOf('  let dcaEditGeneration = 0;'),source.indexOf('  function updateDcaSummary()',source.indexOf('  let dcaEditGeneration = 0;')));
+test('broad DCA editor reads latest saved revision and ignores earlier or detached responses',async()=>{
+  const pending=[],filled=[],panel={isConnected:true};
+  const ctx=vm.createContext({panel,configs:{items:[]},editDcaConfig:null,fillDcaConfig:item=>filled.push(item),fetch:()=>new Promise(resolve=>pending.push(resolve)),dcaForm:{querySelector:()=>({})}});
+  vm.runInContext(dcaEditor,ctx);
+  const first=ctx.editDcaConfig({configId:'config.a'}),second=ctx.editDcaConfig({configId:'config.b'});
+  const item={configId:'config.b',strategyTemplateId:'strategy.monthly_dca_three_bucket',revision:7,title:'Latest',snapshotId:frozen,transactionSettings:{amount:1234}};
+  pending[1]({ok:true,json:async()=>({items:[item]})});await second;
+  pending[0]({ok:true,json:async()=>({items:[{...item,configId:'config.a',revision:1}]})});await first;
+  assert.deepEqual(filled,[item]);assert.equal(ctx.configs.items[0].revision,7);
+  const detached=ctx.editDcaConfig({configId:'config.b'});panel.isConnected=false;
+  pending[2]({ok:true,json:async()=>({items:[item]})});await detached;assert.equal(filled.length,1);
+});
+test('broad DCA editor refuses missing or wrong strategy without filling a generic form',async()=>{
+  const message={textContent:''};let filled=false;
+  const ctx=vm.createContext({panel:{isConnected:true},configs:{items:[]},editDcaConfig:null,fillDcaConfig:()=>{filled=true;},fetch:async()=>({ok:true,json:async()=>({items:[{configId:'config.a',strategyTemplateId:'strategy.legacy_510300_pe_dca'}]})}),dcaForm:{querySelector:()=>message}});
+  vm.runInContext(dcaEditor,ctx);await ctx.editDcaConfig({configId:'config.a'});
+  assert.equal(filled,false);assert.ok(message.textContent.includes('类型不匹配'));assert.deepEqual(ctx.configs.items,[]);
 });
 test('changing archived version clears old snapshot and requires freezing again',async()=>{
   const f=await fixture();await f.button('冻结当前归档版本').fire('click');
