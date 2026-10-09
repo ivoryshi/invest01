@@ -1,6 +1,6 @@
 {
   "name": "investment-workbench-01",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,7 @@
     "factor:backtest": "node scripts/factor-backtest.js",
     "factor:acceptance": "node scripts/factor-acceptance.js",
     "test": "node --test",
-    "test:portable": "node --test tests/fund-maintenance.test.js tests/pinned-python.test.js",
+    "test:portable": "node --test tests/fund-maintenance.test.js tests/pinned-python.test.js tests/source-baseline.test.js",
     "check": "node scripts/check.js",
     "build": "python3 modules/observatory/src/build.py",
     "build:observatory": "python3 modules/observatory/src/build.py",

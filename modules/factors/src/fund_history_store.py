@@ -39,6 +39,8 @@ def open_reader(database, expected_sha256=None):
     if file.is_symlink() or not file.is_file():
         raise ValueError('fund_history_database_not_imported')
     if expected_sha256 is not None:
+        if not hasattr(sqlite3.Connection, 'deserialize'):
+            raise ValueError('frozen_fund_history_requires_sqlite_deserialize')
         raw, sha = read_file(file, 64*1024*1024)
         if sha != expected_sha256:
             raise ValueError('frozen_snapshot_integrity_failed')

@@ -178,17 +178,27 @@ const assets = new Map([
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
 ]);
 let factorWriteBusy = false;
+function requestErrorResponse(error, method) {
+  const missing = ['ENOENT', 'ENOTDIR'].includes(error.code);
+  return { status: missing ? 503 : 500,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
+    body: method === 'HEAD' ? undefined : JSON.stringify({ error: missing ? 'data_source_unavailable' : 'request_failed' }) };
+}
 export async function dispatchRequest(options = {}, request = {}) {
   let mutation = false;
   try { mutation = new URL(request.url || '/', 'http://localhost').pathname.startsWith('/api/modules/factors/v1/') && !['GET', 'HEAD'].includes(request.method || 'GET'); } catch { /* URL validation stays in the dispatcher. */ }
-  if (!mutation) return dispatchUnlocked(options, request);
+  if (!mutation) {
+    try { return await dispatchUnlocked(options, request); }
+    catch (error) { return requestErrorResponse(error, request.method); }
+  }
   if (factorWriteBusy) return { status: 409, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ error: 'factor_write_in_progress_do_not_retry_automatically' }) };
   factorWriteBusy = true;
   try { return await dispatchUnlocked(options, request); }
+  catch (error) { return requestErrorResponse(error, request.method); }
   finally { factorWriteBusy = false; }
 }
 
-async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSnapshotStore } = {}, { method = 'GET', url: rawUrl = '/', body } = {}) {
+async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSnapshotStore, legacyExportReader = readOldFactorJson } = {}, { method = 'GET', url: rawUrl = '/', body } = {}) {
   const publicAssets = moduleAssets(modules);
   const headers = {
     'X-Content-Type-Options': 'nosniff',
@@ -220,7 +230,7 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
       } catch { return json(404, { error: 'asset_unavailable' }); }
     }
     if (standalone) return json(404, { error: 'not_found' });
-    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.5', mode: 'local', dataConnected: false });
+    if (url.pathname === '/api/health') return json(200, { status: 'ok', version: '0.5.6', mode: 'local', dataConnected: false });
     if (url.pathname === '/api/workspaces') return json(200, { items: workspaces });
     if (url.pathname === '/api/contracts/v1/core') return json(200, coreContract);
     if (url.pathname === '/api/contracts/v1/factors') return json(200, factorExperimentContract);
@@ -237,9 +247,9 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
     if (url.pathname === '/api/modules/factors/v1/snapshots') return factorSnapshots(json);
     if (url.pathname === '/api/modules/factors/v1/snapshots/frozen' || url.pathname.startsWith('/api/modules/factors/v1/snapshots/frozen/')) return factorFrozenSnapshots(url, { method, body, json, snapshotStore });
     if (url.pathname === '/api/modules/factors/v1/definitions') return factorDefinitions(json);
-    if (url.pathname === '/api/modules/factors/v1/visual-lab') return factorVisualLab(json);
-    if (url.pathname === '/api/modules/factors/v1/experiment-comparison') return factorExperimentComparison(json);
-    if (url.pathname === '/api/modules/factors/v1/product-state') return factorProductState(json);
+    if (url.pathname === '/api/modules/factors/v1/visual-lab') return factorVisualLab(json, legacyExportReader);
+    if (url.pathname === '/api/modules/factors/v1/experiment-comparison') return factorExperimentComparison(json, legacyExportReader);
+    if (url.pathname === '/api/modules/factors/v1/product-state') return factorProductState(json, legacyExportReader);
     if (url.pathname === '/api/modules/factors/v1/library') return factorLibrary(json);
     if (['options','frozen-options','preview'].some(mode => url.pathname === `/api/modules/factors/v1/legacy-dca/${mode}`)) return legacyDcaApi(url, {method,body,json,snapshotStore});
     if (['options','validate','preview'].some(mode => url.pathname === `/api/modules/factors/v1/custom-expression/${mode}`)) return customExpressionApi(url, {method,body,json,snapshotStore});
@@ -304,17 +314,25 @@ async function dispatchUnlocked({ modules, standalone, snapshotStore = defaultSn
     }
 }
 
-export function createServer({ modules, standalone, snapshotStore } = {}) {
+export function createServer({ modules, standalone, snapshotStore, legacyExportReader } = {}) {
   const server = http.createServer(async (req, res) => {
+    try {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const body = Buffer.concat(chunks).toString('utf8');
-    const response = await dispatchRequest({ modules, standalone, snapshotStore }, { method: req.method, url: req.url, body });
+    const response = await dispatchRequest({ modules, standalone, snapshotStore, legacyExportReader }, { method: req.method, url: req.url, body });
     for (const [name, value] of Object.entries(response.headers)) res.setHeader(name, value);
     res.writeHead(response.status);
     res.end(response.body);
+    } catch (error) {
+      if (res.destroyed) return;
+      if (res.headersSent) { res.destroy(); return; }
+      const response = requestErrorResponse(error, req.method);
+      res.writeHead(response.status, response.headers);
+      res.end(response.body);
+    }
   });
-  server.dispatch = request => dispatchRequest({ modules, standalone, snapshotStore }, request);
+  server.dispatch = request => dispatchRequest({ modules, standalone, snapshotStore, legacyExportReader }, request);
   return server;
 }
 
@@ -598,13 +616,13 @@ function factorDefinitions(json) {
   });
 }
 
-async function factorVisualLab(json) {
+async function factorVisualLab(json, readExport = readOldFactorJson) {
   const [app, report, study, loo, comps] = await Promise.all([
-    readOldFactorJson('out/app_data.json'),
-    readOldFactorJson('out/report.json'),
-    readOldFactorJson('out/factor_study.json'),
-    readOldFactorJson('out/factor_loo.json'),
-    readOldFactorJson('out/lab_comps.json'),
+    readExport('out/app_data.json'),
+    readExport('out/report.json'),
+    readExport('out/factor_study.json'),
+    readExport('out/factor_loo.json'),
+    readExport('out/lab_comps.json'),
   ]);
   const base = report.base;
   const dates = app.dates;
@@ -678,10 +696,10 @@ async function factorVisualLab(json) {
   });
 }
 
-async function factorExperimentComparison(json) {
+async function factorExperimentComparison(json, readExport = readOldFactorJson) {
   const [app, comps] = await Promise.all([
-    readOldFactorJson('out/app_data.json'),
-    readOldFactorJson('out/lab_comps.json'),
+    readExport('out/app_data.json'),
+    readExport('out/lab_comps.json'),
   ]);
   const dates = app.dates;
   const items = Object.entries(comps.comps || {}).map(([key, values]) => {
@@ -774,12 +792,12 @@ function comparisonMetrics(dates, values) {
   };
 }
 
-async function factorProductState(json) {
+async function factorProductState(json, readExport = readOldFactorJson) {
   const [app, report, study, loo, configs] = await Promise.all([
-    readOldFactorJson('out/app_data.json'),
-    readOldFactorJson('out/report.json'),
-    readOldFactorJson('out/factor_study.json'),
-    readOldFactorJson('out/factor_loo.json'),
+    readExport('out/app_data.json'),
+    readExport('out/report.json'),
+    readExport('out/factor_study.json'),
+    readExport('out/factor_loo.json'),
     readFactorExperimentConfigs(),
   ]);
   const base = report.base;

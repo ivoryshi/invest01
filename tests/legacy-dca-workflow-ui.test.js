@@ -5,10 +5,12 @@ import vm from 'node:vm';
 
 class Node {
   constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.value='';this.disabled=false;this.checked=false;}
-  append(...children){children.forEach(child=>{child.parent=this;this.children.push(child);});}
+  append(...children){const empty=this.children.length===0;children.forEach(child=>{child.parent=this;this.children.push(child);});if(empty&&this.tag==='select')this.value=this.children[0]?.value||'';}
+  prepend(...children){children.forEach(child=>{child.parent=this;});this.children.unshift(...children);}
   replaceChildren(...children){this.children=[];this.append(...children);}
   setAttribute(){}
   addEventListener(type,fn){(this.listeners[type]||=[]).push(fn);}
+  get selectedOptions(){return this.children.filter(child=>child.value===this.value);}
   async fire(type){const work=[];for(let node=this;node;node=type==='change'?node.parent:null)for(const fn of node.listeners[type]||[])work.push(fn({target:this,preventDefault(){}}));await Promise.all(work);}
 }
 const descendants=n=>[n,...n.children.flatMap(descendants)];
@@ -16,14 +18,19 @@ const source=await readFile(new URL('../apps/web/app.js',import.meta.url),'utf8'
 const panel=source.slice(source.indexOf('async function legacyDcaReplayPanel('),source.indexOf('async function customExpressionPanel('));
 const frozen='snapshot.frozen.'+'f'.repeat(64), archive='a'.repeat(64), sha='b'.repeat(64);
 const defaults={amount:10000,fee:.0001,slippage:.0005,nth:1,startMonth:'2026-05',endMonth:'2026-07',timingEnabled:true,peKey:'TTM',years:5,mode:'pool',cashRate:.02,ladder:[{hi:100,multiple:1}]};
-async function fixture({missingArchive=false}={}){
+async function fixture({missingArchive=false,preview=false}={}){
   const posts=[];let configs=missingArchive?[{configId:'config.frozen_only',title:'Frozen only',revision:3,strategyTemplateId:'strategy.legacy_510300_pe_dca',snapshotId:frozen,strategySettings:{archiveId:archive,sourceSha256:sha,parameters:defaults},notes:'preserve me',comparisonLimits:['custom_same_currency']}]:[],refreshes=0;
   const element=(tag,text)=>Object.assign(new Node(tag),{textContent:text});
+  const charts=[];
   const context=vm.createContext({element,option:(value,text)=>Object.assign(element('option',text),{value}),document:{createElement:tag=>new Node(tag)},URLSearchParams,
+    resultDiagnosticTable:title=>element('table',title),fmtPct:String,money:String,csvText:()=>'',accountModeSeries:()=>({}),
+    factorRecordBrowser:label=>({node:element('records',label),setItems(){}}),
+    chartWorkspace:(series,options)=>{const node=element('chart');node.options=options;node.setMarkers=markers=>{node.options={...node.options,markers};};charts.push(node);return node;},
     editLegacyDcaConfig:null,refreshBacktestTools:async()=>{refreshes++;},refreshFactorExecution:async()=>{},fetch:async(url,init)=>{
       let data;
       if(init){const body=JSON.parse(init.body);posts.push({url,method:init.method,body});
-        if(url.endsWith('/snapshots/frozen'))data={snapshotId:frozen};
+        if(preview&&url.endsWith('/legacy-dca/preview'))data={metrics:{},parameters:body.parameters,sourceVersion:{archiveId:archive,sha256:sha},calculationSources:[],temporalEligibility:{status:'not_point_in_time_verified'},trades:[{date:'2026-05-01',status:'buy',multiple:1,spend:10000}],accountLedger:[{date:'2026-05-01',adjustedClose:4,ma20:3,accountValue:10000}]};
+        else if(url.endsWith('/snapshots/frozen'))data={snapshotId:frozen};
         else{const item={...body,revision:init.method==='PUT'?2:1};configs=[item];data={item};}
       }else if(url.includes('/options')||url.includes('/frozen-options')){if(missingArchive&&!url.includes('/frozen-options'))return{ok:false,json:async()=>({error:'archive missing'})};const id=new URL('http://localhost'+url).searchParams.get('archiveId')||archive;data={sourceVersion:{archiveId:id,sha256:sha},defaults,archives:[{archiveId:archive,createdAt:'old'},{archiveId:'c'.repeat(64),createdAt:'new'}],pricePeriod:['2012-05-01','2026-07-31'],priceObservations:3446,peObservations:5179};}
       else if(url.includes('/experiment-configs/'))data={item:configs.find(c=>url.endsWith('/'+c.configId))};
@@ -32,8 +39,19 @@ async function fixture({missingArchive=false}={}){
     }});
   vm.runInContext(`${panel};globalThis.create=legacyDcaReplayPanel`,context);
   const root=await context.create(),nodes=()=>descendants(root);
-  return{posts,nodes,field:name=>nodes().find(n=>n.name===name),button:text=>nodes().find(n=>n.tag==='button'&&n.textContent===text),refreshes:()=>refreshes,edit:id=>context.editLegacyDcaConfig({configId:id}),update:fn=>{configs=configs.map(fn);}};
+  return{posts,nodes,charts,field:name=>nodes().find(n=>n.name===name),button:text=>nodes().find(n=>n.tag==='button'&&n.textContent===text),refreshes:()=>refreshes,edit:id=>context.editLegacyDcaConfig({configId:id}),update:fn=>{configs=configs.map(fn);}};
 }
+test('PE marker visibility is display-only and does not resubmit the preview or alter configuration',async()=>{
+  const f=await fixture({preview:true});await f.nodes().find(n=>n.tag==='form').fire('submit');
+  const mode=f.nodes().find(n=>n.tag==='select'&&n.children.some(x=>x.value==='price'));
+  mode.value='price';await mode.fire('change');
+  const toggle=f.nodes().find(n=>n.tag==='input'&&n.parent.textContent==='显示买入/停投标记');
+  assert.equal(toggle.disabled,false);assert.equal(f.charts.at(-1).options.markers.length,1);
+  toggle.checked=false;await toggle.fire('change');assert.equal(f.charts.at(-1).options.markers.length,0);
+  toggle.checked=true;await toggle.fire('change');assert.equal(f.charts.at(-1).options.markers.length,1);
+  mode.value='nav';await mode.fire('change');assert.equal(toggle.disabled,true);
+  assert.equal(f.posts.length,1);assert.ok(f.posts[0].url.endsWith('/preview'));assert.deepEqual(f.posts[0].body.parameters,defaults);
+});
 test('PE formal save requires an explicit selected archive freeze and never runs simulation',async()=>{
   const f=await fixture();await f.button('保存正式配置').fire('click');assert.equal(f.posts.length,0);
   await f.button('冻结当前归档版本').fire('click');await f.button('保存正式配置').fire('click');

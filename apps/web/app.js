@@ -10,6 +10,7 @@ document.querySelector('.skip').addEventListener('click', event => {
 const nav = document.querySelector('#workbench-nav');
 const content = document.querySelector('#workbench-content');
 let cleanup = null;
+let renderRevision = 0;
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text) node.textContent = text;
@@ -18,6 +19,23 @@ function element(tag, text, className) {
 }
 function showError(error) {
   content.replaceChildren(element('h1', '工作区加载失败'), element('p', `${error.message}。请确认本地服务已启动后刷新。`));
+}
+async function appendWorkspacePanels(target, panels, isCurrent) {
+  for (const [title, load] of panels) {
+    if (!isCurrent()) return;
+    let panel;
+    try { panel = await load(isCurrent); }
+    catch {
+      panel = element('section', null, 'empty');
+      panel.append(element('h2', title), element('p', '暂不可用：数据缺失或读取失败。', 'status'));
+    }
+    if (!isCurrent()) return;
+    target.append(panel);
+  }
+}
+async function runWorkspaceRender(load, isCurrent) {
+  try { await load(); }
+  catch (error) { if (isCurrent()) showError(error); }
 }
 async function researchPanel() {
   const panel = element('section', null, 'research-native');
@@ -146,7 +164,7 @@ function lineChart(series, options = {}) {
       const [x, y] = coordinates(point);
       segment.push(`${x.toFixed(1)},${y.toFixed(1)}`);
       const dot = svg('circle', { cx: x, cy: y, r: 3, fill: item.color, opacity: 0.6 });
-      const title = svg('title'); title.textContent = `${item.name || item.key} · ${point.date} · ${fmtNum(point.value, 4)}`;
+      const title = svg('title'); title.textContent = `${item.name || item.label || item.key} · ${point.date} · ${fmtNum(point.value, 4)}`;
       dot.append(title); root.append(dot);
     }
     flush();
@@ -190,7 +208,37 @@ function chartWorkspace(series, options = {}) {
     chart.addEventListener('pointerdown', event => { if (event.button === 0 && chart.chartDateDomain) { dragStart = chartDate(event); chart.setPointerCapture(event.pointerId); } });
     chart.addEventListener('pointerup', event => { if (!dragStart) return; const release = chartDate(event), pair = [dragStart, release].sort(); dragStart = null; if (pair[0] !== pair[1]) { start.value=pair[0];end.value=pair[1];draw(); } });
     chart.addEventListener('pointercancel', () => { dragStart = null; });
-    plot.replaceChildren(chart);
+    const readout = element('output', '', 'next'), observations = new Map();
+    readout.setAttribute('role', 'status');
+    for (const item of options.items || []) for (const point of filtered[item.key] || []) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(point.date) || !Number.isFinite(Date.parse(point.date)) || !Number.isFinite(point.value) || (scale.value === 'log' && point.value <= 0)) continue;
+      if (!observations.has(point.date)) observations.set(point.date, []);
+      observations.get(point.date).push(`${item.name || item.label || item.key} ${fmtNum(point.value, 4)}`);
+    }
+    const observationDates = [...observations.keys()].sort();
+    let observationIndex = 0;
+    const showObservation = index => {
+      observationIndex = Math.max(0, Math.min(observationDates.length - 1, index));
+      const date = observationDates[observationIndex];
+      readout.textContent = date ? `${date} · ${observations.get(date).join(' / ')}` : '';
+    };
+    chart.setAttribute('tabindex', observationDates.length ? '0' : '-1');
+    chart.addEventListener('focus', () => showObservation(observationIndex));
+    chart.addEventListener('blur', () => { readout.textContent = ''; });
+    chart.addEventListener('keydown', event => {
+      const index = { ArrowLeft: observationIndex - 1, ArrowRight: observationIndex + 1, Home: 0, End: observationDates.length - 1 }[event.key];
+      if (index !== undefined) { event.preventDefault(); showObservation(index); }
+    });
+    chart.addEventListener('pointermove', event => {
+      if (!chart.chartDateDomain || !observationDates.length) return;
+      const date = chartDate(event);
+      let index = observationDates.findIndex(value => value >= date);
+      if (index < 0) index = observationDates.length - 1;
+      if (index > 0 && Date.parse(date) - Date.parse(observationDates[index - 1]) < Date.parse(observationDates[index]) - Date.parse(date)) index--;
+      showObservation(index);
+    });
+    chart.addEventListener('pointerleave', () => { if (document.activeElement !== chart) readout.textContent = ''; });
+    plot.replaceChildren(chart, readout);
   }
   function zoom(ratio) {
     const lo=Date.parse(start.value),hi=Date.parse(end.value); if (!Number.isFinite(lo) || hi<=lo) return;
@@ -212,6 +260,7 @@ function chartWorkspace(series, options = {}) {
   start.addEventListener('change',draw);end.addEventListener('change',draw);scale.addEventListener('change',draw);
   controls.prepend(start,end,presets,scale);node.append(controls,status,plot);
   node.setItems = items => { options = { ...options, items }; draw(); };
+  node.setMarkers = markers => { options = { ...options, markers }; draw(); };
   draw();return node;
 }
 function barTrack(item, maxAbs) {
@@ -557,7 +606,7 @@ async function populateSnapshotSelect(select, baseSnapshotId) {
   } });
 }
 
-async function frozenSnapshotPanel() {
+async function frozenSnapshotPanel(isCurrent = () => true) {
   const panel = element('section', null, 'frozen-snapshot-panel wide-card');
   panel.append(element('h3', '冻结数据版本'));
   const form = document.createElement('form');
@@ -607,13 +656,14 @@ async function frozenSnapshotPanel() {
     } catch (error) { message.textContent = error.message; }
     finally { submit.disabled = false; }
   });
+  if (!isCurrent()) return panel;
   refreshFrozenSnapshotList = async () => { if (panel.isConnected) await renderList(); };
   panel.append(form, message, element('p', '单次冻结上限64MiB。基金数据库须在基金配置中绑定选定份额与基准后冻结，不复制整库。冻结时间不是数据截止日或历史可得时间，本地副本不是外部备份。', 'next'), list);
   try { await renderList(); } catch (error) { message.textContent = error.message; }
   return panel;
 }
 
-async function factorDataLayerPanel() {
+async function factorDataLayerPanel(isCurrent = () => true) {
   const [response, schemaResponse] = await Promise.all([
     fetch('/api/modules/factors/v1/data-layer'),
     fetch('/api/modules/factors/v1/data-layer/schema'),
@@ -694,7 +744,7 @@ async function factorDataLayerPanel() {
   }
   schemaTable.append(schemaBody);
   schemaCard.append(schemaTable);
-  grid.append(assets, jobs, await frozenSnapshotPanel(), schemaCard, factorDataPreviewWorkspace(data.assets, schema.items), exports);
+  grid.append(assets, jobs, await frozenSnapshotPanel(isCurrent), schemaCard, factorDataPreviewWorkspace(data.assets, schema.items), exports);
   const notes = element('section', null, 'product-notes');
   notes.append(element('h3', '数据边界'));
   for (const note of data.notes) notes.append(element('p', note));
@@ -1161,11 +1211,14 @@ async function legacyDcaReplayPanel() {
       message.textContent=p.mode==='pool'?'已复算：同额承诺现金流；未写配置、请求或结果库。':'已复算：不同实际现金流，终值不可排名；XIRR分别计算，未写配置、请求或结果库。';
       result.append(resultDiagnosticTable('全期账户指标',['指标','PE策略','固定定投'],[['终值',money(data.metrics.finalValue),money(data.metrics.benchmarkFinalValue)],['累计实际投入',money(data.metrics.totalContributed),money(data.metrics.benchmarkContributed)],['实际日期XIRR',fmtPct(data.metrics.moneyWeightedIrr),fmtPct(data.metrics.benchmarkMoneyWeightedIrr)]]));
       const mode=document.createElement('select');mode.setAttribute('aria-label','510300复算图表');for(const [key,title]of [['value','账户价值'],['nav','单位净值'],['profit','累计简单收益'],['drawdown','历史高点回撤'],['pe','PE分位'],['excess','择时净值差'],['price','复权价格与均线']])mode.append(option(key,title));
+      const markerLabel=element('label','显示买入/停投标记'),markerToggle=document.createElement('input');markerToggle.type='checkbox';markerToggle.checked=true;markerLabel.prepend(markerToggle);
+      let currentChart=null,currentMarkers=[];
       const chart=element('section');const draw=()=>{
         const ledger=data.accountLedger;let series,items,markers=[];
         if(['profit','drawdown'].includes(mode.value)){series=accountModeSeries(ledger,mode.value);items=[{key:'strategy',name:'PE策略',color:'#a62536'},{key:'benchmark',name:'固定定投',color:'#24764c'}];}
         else {const keys=mode.value==='value'?['accountValue','benchmarkValue','cash']:mode.value==='nav'?['unitNav','benchmarkNav','lumpBenchmarkNav']:mode.value==='pe'?['pePercentile']:mode.value==='excess'?['timingExcessNav']:['adjustedClose','ma20','ma60','ma200'];series=Object.fromEntries(keys.map(key=>[key,ledger.map(row=>({date:row.date,value:row[key]}))]));const labels={accountValue:'PE账户',benchmarkValue:'固定定投账户',cash:'闲置现金',unitNav:'PE净值',benchmarkNav:'定投净值',lumpBenchmarkNav:'首日一次性买入净值',pePercentile:'前观测日PE分位',timingExcessNav:'PE净值减定投净值（非IRR差）',adjustedClose:'复权收盘',ma20:'MA20',ma60:'MA60',ma200:'MA200'};items=keys.map((key,i)=>({key,name:labels[key],color:['#a62536','#24764c','#2764a5','#777'][i]}));if(mode.value==='price'){const prices=new Map(ledger.map(row=>[row.date,row.adjustedClose]));markers=data.trades.map(row=>({date:row.date,value:prices.get(row.date),status:row.status,label:`${row.multiple}倍 / ${money(row.spend)}元`}));}}
-        chart.replaceChildren(element('p',items.map(x=>x.name).join(' / '),'next'),chartWorkspace(series,{items,markers,label:`510300 ${mode.selectedOptions[0].textContent}`}));};mode.addEventListener('change',draw);result.append(mode,chart);draw();
+        markerToggle.disabled=mode.value!=='price';currentMarkers=markers;currentChart=chartWorkspace(series,{items,markers:markerToggle.checked?markers:[],label:`510300 ${mode.selectedOptions[0].textContent}`});
+        chart.replaceChildren(element('p',items.map(x=>x.name).join(' / '),'next'),currentChart);};mode.addEventListener('change',draw);markerToggle.addEventListener('change',()=>currentChart?.setMarkers(markerToggle.checked?currentMarkers:[]));result.append(mode,markerLabel,chart);draw();
       const trades=factorRecordBrowser('510300交易记录',row=>resultDiagnosticTable(row.date,['状态','信号观测日','PE','分位','倍数','投入','买入','现金'],[[row.status,row.signalDate,fmtNum(row.pe),fmtPct(row.percentile),row.multiple,money(row.deposit),money(row.spend),money(row.cash)]]));trades.setItems(data.trades.map(row=>({...row,title:row.date})));result.append(trades.node);
       const metadata={archiveId:data.sourceVersion.archiveId,sourceSha256:data.sourceVersion.sha256,calculationSources:data.calculationSources,version:data.version,parameters:data.parameters,temporalEligibility:data.temporalEligibility.status};
       const tradeRows=data.trades.map(row=>({...metadata,...row})),ledgerRows=data.accountLedger.map(row=>({...metadata,...row}));
@@ -1184,7 +1237,7 @@ async function legacyDcaReplayPanel() {
   await load();try{await refreshSaved();}catch(error){message.textContent=error.message;}return panel;
 }
 
-async function customExpressionPanel() {
+async function customExpressionPanel(isCurrent = () => true) {
   const panel = element('section', null, 'strategy-config-workbench');
   panel.id = 'custom-expression';
   panel.append(element('h2', '可执行因子与行业策略'));
@@ -1199,6 +1252,7 @@ async function customExpressionPanel() {
     options = await api('/api/modules/factors/v1/custom-expression/options');
     configs = await api('/api/modules/factors/v1/experiment-configs');
   } catch (error) { panel.append(element('p', error.message, 'warning')); return panel; }
+  if (!isCurrent()) return panel;
   const template = configs.templates.find(t => t.strategyTemplateId === 'strategy.custom_industry_expression');
   const copy = value => JSON.parse(JSON.stringify(value));
   function editor(title) {
@@ -1291,6 +1345,7 @@ async function customExpressionPanel() {
   button(definition.box, '校验公式', () => locked(definition, async () => showValidation(await api('/api/modules/factors/v1/custom-expression/validate', { executionSpec: spec() }))));
   button(definition.box, '新建定义', () => { if (!definition.busy) fillDefinition(); });
   button(definition.box, '保存可执行定义', null, 'submit');
+  if (!isCurrent()) return panel;
   editExpressionFactor = item => locked(definition, async () => {
     const result = await api(`/api/modules/factors/v1/library/submissions/${encodeURIComponent(item.factorFamilyId)}`);
     fillDefinition(result.item); panel.scrollIntoView({ block: 'start' });
@@ -1341,6 +1396,7 @@ async function customExpressionPanel() {
       strategySettings: { ...template.strategySettings, ...Object.fromEntries(['startDate', 'endDate'].map(key => [key, c[key].value])),
         ...Object.fromEntries(['topN', 'minInvestable', 'signalLagDays'].map(key => [key, Number(c[key].value)])), factorProgram: copy(program) } };
   }
+  if (!isCurrent()) return panel;
   editExpressionConfig = item => locked(strategy, async () => {
     configs = await api('/api/modules/factors/v1/experiment-configs');
     const current = item.configId ? configs.items.find(x => x.configId === item.configId) : template;
@@ -1749,7 +1805,7 @@ function resultDiagnosticTable(title, headers, rows) {
   table.append(thead, tbody); section.append(table); return section;
 }
 
-async function industryConfigPanel(library) {
+async function industryConfigPanel(library, isCurrent = () => true) {
   const panel = element('section', null, 'strategy-config-workbench');
   panel.id = 'industry-config';
   panel.append(element('h2', '原始行业回测配置'));
@@ -1757,6 +1813,7 @@ async function industryConfigPanel(library) {
   if (!response.ok) { panel.append(element('p', '行业计算定义暂时无法读取。', 'warning')); return panel; }
   const definitions = await response.json();
   let configs = await (await fetch('/api/modules/factors/v1/experiment-configs')).json();
+  if (!isCurrent()) return panel;
   const template = configs.templates.find(item => item.strategyTemplateId === 'strategy.industry_parquet_monthly_topn');
   const form = document.createElement('form');
   form.className = 'strategy-config-card';
@@ -1807,6 +1864,7 @@ async function industryConfigPanel(library) {
   }
   form.querySelector('.factor-weight-list').append(slotActions);
   await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.etf_smartbeta.industry_execution.current');
+  if (!isCurrent()) return panel;
   refreshIndustrySnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.etf_smartbeta.industry_execution.current'); };
   let generation = 0;
   let saving = false;
@@ -1893,7 +1951,7 @@ async function industryConfigPanel(library) {
   return panel;
 }
 
-async function threeBucketConfigPanel(library) {
+async function threeBucketConfigPanel(library, isCurrent = () => true) {
   const panel = element('section', null, 'strategy-config-workbench');
   panel.id = 'three-bucket-config';
   panel.append(element('h2', 'A/B/C三档定投配置'));
@@ -1943,6 +2001,7 @@ async function threeBucketConfigPanel(library) {
   form.append(grid, weightList, notesLabel, element('p', '月度首个共同数据日收盘定投。B比例大于0时取宽基／行业日期交集；宽基／行业指数代理，C现金是固定收益率模型。宏观滞后为假设，不是已核验的发布日期；基准不扣费。', 'next'), actions, message);
   panel.append(form);
   await populateSnapshotSelect(controls.snapshotId, template.snapshotId);
+  if (!isCurrent()) return panel;
   refreshThreeBucketSnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(controls.snapshotId, template.snapshotId); };
   let editingId = null, generation = 0, saving = false, loading = false;
   function renderSaved() {
@@ -2009,7 +2068,7 @@ async function threeBucketConfigPanel(library) {
   fill(template); return panel;
 }
 
-async function fundNavConfigPanel() {
+async function fundNavConfigPanel(isCurrent = () => true) {
   const panel = element('section', null, 'strategy-config-workbench'); panel.id = 'fund-nav-config';
   panel.append(element('h2', '基金历史净值定投'));
   const baseSnapshotId = 'snapshot.fund_warehouse.nav_db.current';
@@ -2042,6 +2101,7 @@ async function fundNavConfigPanel() {
   }
   field('savedConfig', '已保存配置', 'text', [['', '新配置']]); field('configId', '配置ID'); field('title', '标题');
   const versionLabel = element('label', '基金净值数据版本'); versionLabel.append(picker); grid.append(versionLabel); controls.snapshotId = picker;
+  if (!isCurrent()) return panel;
   refreshFundNavSnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(picker, baseSnapshotId); };
   field('benchmarkId', '显式单指数基准', 'text', options.benchmarks.map(id => [id, id]));
   field('startDate', '开始日期', 'date'); field('endDate', '结束日期', 'date'); field('amount', '每笔投入金额', 'number');
@@ -2140,6 +2200,7 @@ async function fundNavConfigPanel() {
     profileView.replaceChildren(); message.textContent = binding ? '保留数据库导入版本绑定；导入版本变化后执行需重读。' : '';
     renderSaved(); syncButtons();
   }
+  if (!isCurrent()) return panel;
   editFundNavConfig = async item => {
     const sent = ++generation; editSession += 1; loading = true; message.textContent = '正在加载草案。'; syncButtons();
     try {
@@ -2203,7 +2264,7 @@ async function fundNavConfigPanel() {
   fill({ ...template, snapshotId: initialSnapshotId }); return panel;
 }
 
-async function strategyConfigWorkbenchPanel(library) {
+async function strategyConfigWorkbenchPanel(library, isCurrent = () => true) {
   let configs = await (await fetch('/api/modules/factors/v1/experiment-configs')).json();
   const panel = element('section', null, 'strategy-config-workbench');
   const header = element('section', null, 'strategy-config-head');
@@ -2410,6 +2471,7 @@ async function strategyConfigWorkbenchPanel(library) {
   dcaForm.elements.cashBucketPolicy.append(option('broad_only', '单一宽基'), option('broad_split_cash', '沪深300 / 中证1000 / 现金'), option('bucket_a_b_c', '旧行业 / 宏观三档（待迁移）'), option('custom_bucket', '旧自定义分档（待迁移）'));
   dcaForm.elements.executionRule.append(option('fixed_contribution_hold', '固定定投，持续持有，无卖出或再平衡'), option('legacy_rules', '旧自定义规则（待迁移）'));
   await populateSnapshotSelect(dcaForm.elements.snapshotId, 'snapshot.etf_smartbeta.broad_panel.current');
+  if (!isCurrent()) return panel;
   refreshDcaSnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(dcaForm.elements.snapshotId, 'snapshot.etf_smartbeta.broad_panel.current'); };
   function fillDcaConfig(item) {
     const settings = item.transactionSettings || {};
@@ -2507,7 +2569,7 @@ async function strategyConfigWorkbenchPanel(library) {
   panel.append(header, cards, saved);
   return panel;
 }
-async function fundScreenWorkbenchPanel() {
+async function fundScreenWorkbenchPanel(isCurrent = () => true) {
   const response = await fetch('/api/modules/factors/v1/fund-screen/options');
   let bindings = await response.json();
   const panel = element('section', null, 'fund-screen-workbench');
@@ -2590,6 +2652,7 @@ async function fundScreenWorkbenchPanel() {
     finally { metadataSaving = false; metadataSave.disabled = !loaded; }
   });
   await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.fund_warehouse.wide_today.current');
+  if (!isCurrent()) return panel;
   refreshFundSnapshotChoices = async () => { if (panel.isConnected) await populateSnapshotSelect(form.elements.snapshotId, 'snapshot.fund_warehouse.wide_today.current'); };
   async function changeSource(specs) {
     const generation = ++sourceGeneration;
@@ -2695,7 +2758,7 @@ async function fundScreenWorkbenchPanel() {
   panel.append(form, dictionary);
   return panel;
 }
-async function backtestToolsPanel() {
+async function backtestToolsPanel(isCurrent = () => true) {
   const panel = element('section', null, 'execution-plan-panel'); panel.id = 'backtest-tools';
   panel.append(element('h2', '回测工具与 Skill'));
   const form = document.createElement('form'); form.className = 'strategy-grid-form';
@@ -2763,6 +2826,7 @@ async function backtestToolsPanel() {
     catch (error) { loaded = false; skill.append(element('p', error.message, 'warning')); }
   });
   form.append(choiceLabel, modeLabel, preflight); panel.append(form, message, detail, acknowledgement, run, auditView, skill);
+  if (!isCurrent()) return panel;
   refreshBacktestTools = async () => { if (panel.isConnected && !busy) { clear(); await loadConfigs(); } };
   try { await loadConfigs(); } catch (error) { message.textContent = error.message; }
   return panel;
@@ -2807,7 +2871,7 @@ function resultExportPanel(item) {
   ]) { const button=element('button',label);button.type='button';button.disabled=label.includes('账本')?!item.accountLedger?.length:label.includes('现金流')?!item.cashFlows?.length:false;button.addEventListener('click',()=>{try{action();message.textContent='已生成本地下载';}catch{message.textContent='下载失败，原结果未改动';}});buttons.append(button); }
   node.append(element('h4','结果导出'),buttons,message);return node;
 }
-async function executionPlanPanel() {
+async function executionPlanPanel(isCurrent = () => true) {
   let plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
   let results = await (await fetch('/api/modules/factors/v1/result-artifacts')).json();
   const panel = element('section', null, 'execution-plan-panel');
@@ -3176,6 +3240,7 @@ async function executionPlanPanel() {
       renderForm();
     };
   }
+  if (!isCurrent()) return panel;
   refreshFactorExecution = async () => {
     if (!panel.isConnected) return;
     plan = await (await fetch('/api/modules/factors/v1/execution-plan')).json();
@@ -3527,9 +3592,11 @@ try {
     nav.append(a);
   }
   async function render() {
+    const revision = ++renderRevision;
+    return runWorkspaceRender(async () => {
     if (cleanup) cleanup();
     cleanup = null;
-    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; editLegacyDcaConfig = null; editDcaConfig = null; editExpressionFactor = null; editExpressionConfig = null;
+    refreshDcaSnapshotChoices = null; refreshFundSnapshotChoices = null; refreshIndustrySnapshotChoices = null; editIndustryConfig = null; refreshThreeBucketSnapshotChoices = null; editThreeBucketConfig = null; editFundNavConfig = null; refreshFundNavSnapshotChoices = null; refreshFrozenSnapshotList = null; refreshBacktestTools = null; refreshFactorExecution = null; editLegacyDcaConfig = null; editDcaConfig = null; editExpressionFactor = null; editExpressionConfig = null;
     const selected = items.find(item => item.id === location.hash.slice(1)) || items[0];
     for (const a of nav.children) {
       if (a.hash === `#${selected.id}`) a.setAttribute('aria-current', 'page');
@@ -3551,35 +3618,50 @@ try {
       const mount = element('section', null, 'native-module');
       mount.setAttribute('aria-label', selected.title);
       content.append(mount);
-      cleanup = await mountLegacyModule(mount, selected.id);
+      const dispose = await mountLegacyModule(mount, selected.id);
+      if (revision !== renderRevision) { dispose?.(); return; }
+      cleanup = dispose;
       return;
     }
-    if (selected.id === 'research') content.append(await researchPanel());
+    if (selected.id === 'research') {
+      const panel = await researchPanel();
+      if (revision !== renderRevision) return;
+      content.append(panel);
+    }
     if (selected.id === 'factors') {
-      const library = await (await fetch('/api/modules/factors/v1/library')).json();
-      content.append(await factorVisualLabPanel());
-      content.append(await legacyDcaReplayPanel());
-      content.append(await experimentComparisonPanel());
-      content.append(await factorProductConsolePanel());
-      content.append(await factorDataLayerPanel());
-      content.append(await dataQualityAuditPanel());
-      content.append(await legacyExperimentLibraryPanel());
-      content.append(await industryConfigPanel(library));
-      content.append(await customExpressionPanel());
-      content.append(await threeBucketConfigPanel(library));
-      content.append(await fundNavConfigPanel());
-      content.append(await strategyConfigWorkbenchPanel(library));
-      content.append(await fundScreenWorkbenchPanel());
-      content.append(await customFactorStudioPanel(library));
-      content.append(await backtestEnginePanel());
-      content.append(await backtestToolsPanel());
-      content.append(await executionPlanPanel());
-      content.append(await factorsPanel());
-      content.append(await experimentConfigPanel(library));
-      content.append(await factorLabFrameworkPanel());
+      const libraryResponse = await fetch('/api/modules/factors/v1/library');
+      if (revision !== renderRevision) return;
+      if (!libraryResponse.ok) throw new Error('因子库服务暂不可用');
+      const library = await libraryResponse.json();
+      await appendWorkspacePanels(content, [
+        ['历史图表与因子定位', factorVisualLabPanel],
+        ['510300归档PE定投', legacyDcaReplayPanel],
+        ['历史实验对比', experimentComparisonPanel],
+        ['实验控制台', factorProductConsolePanel],
+        ['因子数据层', factorDataLayerPanel],
+        ['数据质量审计', dataQualityAuditPanel],
+        ['旧实验资产库', legacyExperimentLibraryPanel],
+        ['行业策略配置', current => industryConfigPanel(library, current)],
+        ['自建行业公式', customExpressionPanel],
+        ['三档定投配置', current => threeBucketConfigPanel(library, current)],
+        ['基金净值配置', fundNavConfigPanel],
+        ['策略配置工作台', current => strategyConfigWorkbenchPanel(library, current)],
+        ['基金筛选工作台', fundScreenWorkbenchPanel],
+        ['自建因子', () => customFactorStudioPanel(library)],
+        ['回测引擎', backtestEnginePanel],
+        ['回测工具', backtestToolsPanel],
+        ['执行计划', executionPlanPanel],
+        ['因子库', factorsPanel],
+        ['实验配置库', () => experimentConfigPanel(library)],
+        ['因子实验室能力', factorLabFrameworkPanel],
+      ], () => revision === renderRevision);
       return;
     }
-    if (selected.status === 'not_connected' && selected.id !== 'factors') content.append(await contractPanel());
+    if (selected.status === 'not_connected' && selected.id !== 'factors') {
+      const panel = await contractPanel();
+      if (revision !== renderRevision) return;
+      content.append(panel);
+    }
     const grid = element('section', null, 'grid');
     grid.setAttribute('aria-label', '全部工作区');
     for (const item of items) {
@@ -3588,9 +3670,10 @@ try {
       grid.append(a);
     }
     content.append(grid);
+    }, () => revision === renderRevision);
   }
-  addEventListener('hashchange', () => { render().catch(showError); });
-  render().catch(showError);
+  addEventListener('hashchange', () => { void render(); });
+  void render();
 } catch (error) {
   showError(error);
 }

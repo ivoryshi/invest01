@@ -1,6 +1,6 @@
 # 开发与验收
 
-当前v0.5.2，Node基线24.14.0（.nvmrc），ES Modules、原生HTTP与浏览器模块，零npm第三方依赖，无需npm install。package.json还声明支持22.23.1以上22.x，但本批没有重做双版本矩阵。Python执行依赖与版本见[requirements](../../modules/factors/requirements.txt)。
+当前v0.5.6，Node基线24.14.0（.nvmrc），ES Modules、原生HTTP与浏览器模块，零npm第三方依赖，无需npm install。package.json还声明支持22.23.1以上22.x，但本批没有重做双版本矩阵。Python执行依赖与版本见[requirements](../../modules/factors/requirements.txt)。基金冻结要求Python 3.11以上且SQLite提供deserialize；维护CLI依赖POSIX fcntl，Windows未验证。完整基线见[发布记录](records/FACTOR-RELEASE-V056.md)。
 
 ## 目录与责任
 
@@ -19,7 +19,7 @@
 ## 验证分层
 
 - npm run check：JavaScript语法和Markdown本地链接；不证明Python计算或浏览器显示。
-- npm run test:portable：不需私有数据/NumPy的隔离维护及捕获源码测试，仍需Python 3与Node。
+- npm run test:portable：不需私有数据/NumPy的隔离维护、捕获源码、缺数据异常及工作区竞态测试；仍需POSIX/Python与Node，不代替真实数据回测或浏览器。
 - npm test：全部Node测试入口，部分调用Python/授权真实数据及SQLite API；不是无数据环境的验收承诺。
 - npm run build：仅重建观察台，不抓取、不回测、不恢复日报。
 - npm run test:observatory：观察台专项结构/逻辑校验；当前历史基线182项。

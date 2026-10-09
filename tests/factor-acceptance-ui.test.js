@@ -56,6 +56,32 @@ test('drag selection uses visible curve dates, not hidden histories or input pad
   chart.listeners.pointerdown({button:0,clientX:46,pointerId:1});chart.listeners.pointerup({clientX:742,pointerId:1});
   assert.equal(start.value,'2020-01-03');assert.equal(end.value,'2022-01-03');
 });
+test('chart inspection supports keyboard and pointer using only visible valid observations',()=>{
+  const node=context.chartWorkspace({a:[point('2020-01-01',1),point('2020-01-02',null),point('2020-01-03',2)],hidden:[point('2020-01-02',999)]},{items:[{key:'a',name:'Visible'}],label:'Inspect'});
+  const chart=walk(node).find(n=>n.tag==='svg'),readout=walk(node).find(n=>n.tag==='output');
+  assert.equal(chart.tabindex,'0');chart.listeners.focus();assert.equal(readout.textContent,'2020-01-01 · Visible 1');
+  let prevented=false;chart.listeners.keydown({key:'End',preventDefault(){prevented=true;}});
+  assert.ok(prevented);assert.equal(readout.textContent,'2020-01-03 · Visible 2');
+  chart.listeners.keydown({key:'ArrowLeft',preventDefault(){}});assert.equal(readout.textContent,'2020-01-01 · Visible 1');
+  chart.listeners.pointermove({clientX:742});assert.equal(readout.textContent,'2020-01-03 · Visible 2');
+  chart.listeners.pointerleave();assert.equal(readout.textContent,'');
+});
+test('logarithmic chart inspection excludes nonpositive and missing values',()=>{
+  const node=context.chartWorkspace({a:[point('2020-01-01',0),point('2020-01-02',-1),point('2020-01-03',2)]},{items:[{key:'a'}],label:'Log'});
+  const scale=walk(node).find(n=>n['aria-label']==='Log坐标');scale.value='log';scale.listeners.change();
+  const chart=walk(node).find(n=>n.tag==='svg'),readout=walk(node).find(n=>n.tag==='output');
+  chart.listeners.focus();assert.equal(readout.textContent,'2020-01-03 · a 2');
+  chart.listeners.keydown({key:'Home',preventDefault(){}});assert.equal(readout.textContent,'2020-01-03 · a 2');
+});
+test('marker toggle preserves selected dates and scale without changing the curve',()=>{
+  const marker={date:'2020-01-03',value:2,status:'buy',label:'plan'},node=context.chartWorkspace({a:[point('2020-01-01',1),point('2020-01-03',2)]},{items:[{key:'a'}],markers:[marker],label:'Markers'});
+  const start=walk(node).find(n=>n['aria-label']==='Markers开始日期'),scale=walk(node).find(n=>n['aria-label']==='Markers坐标');
+  start.value='2020-01-02';scale.value='log';scale.listeners.change();
+  const titles=()=>walk(node).filter(n=>n.tag==='title').map(n=>n.textContent);
+  assert.ok(titles().some(text=>text.includes('买入')));node.setMarkers([]);assert.ok(!titles().some(text=>text.includes('买入')));
+  assert.equal(start.value,'2020-01-02');assert.equal(scale.value,'log');assert.ok(titles().some(text=>text.includes('2020-01-03')));
+  node.setMarkers([marker]);assert.ok(titles().some(text=>text.includes('买入')));
+});
 test('record browser can reach every historical result and retains query after refresh', () => {
   const browser = context.factorRecordBrowser('结果资产', row => element('article', row.artifactId));
   const items = Array.from({length:23}, (_,i) => ({artifactId:`result.${i}`,title:`t${i}`}));

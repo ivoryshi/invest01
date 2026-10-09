@@ -1,8 +1,8 @@
 # 投研工作台01
 
-本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前本地版本 **v0.5.5 / 因子迁移 V0.22**。源码发布使用 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，本版远端状态以发布回执为准，不是已经部署的在线服务。
+本地优先的投研工作台，原生整合观察台、研究索引与因子实验室。当前版本 **v0.5.6 / 因子迁移 V0.22**。源码发布使用 [release/factor-migration-v1](https://github.com/ivoryshi/invest01/tree/release/factor-migration-v1)，版本与验证见[发布基线](docs/wiki/records/FACTOR-RELEASE-V056.md)，本版远端状态以发布回执为准，不是已经部署的在线服务。
 
-**因子实验室可执行，但完整迁移尚未关闭。** 回测工具和项目内Skill首版已接通只读预检、明确确认执行、结果复用与结构审计；历史基金选基/PIT、真实成交及旧页面逐项验收仍有剩余。冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
+**因子实验室V1六类核心链路已通过隔离浏览器验收。** 本版补齐图表可见读数/键盘检查、PE交易标记独立显隐、17槽位保存重跑与同组多结果比较；缺旧数据的面板单独报错，不阻断其余配置工具。历史基金选基/PIT、真实成交、手机触屏专项和整体视觉仍不作完成声明。冻结只保证复现，不证明历史无超前数据。基准数据更新、整体前端样式和技术架构按计划后置。详见[迁移清单](docs/wiki/FACTOR-MIGRATION.md)。
 
 已补齐图表日期/区间/框选/缩放、账户收益/回撤、共同窗比较、全部结果查询、实际子因子槽位权重与导出，以及510300归档PE择时复算（分档倍数/现金池/月内买入日/均线与买停标记）。本版将PE纳入正式资产闭环：选择归档→冻结→保存/修改配置→统一预检与双确认→执行→请求/结果入库及审计。原有预览继续只读，参数文件可往返，不自动运行或绕过guarded工具。六类核心浏览器闭环及PE文件/图表往返已在隔离副本验收；完整旧控件路径、差异签核和视觉验收仍开放，证据和剩余项见[迁移验收](docs/wiki/FACTOR-ACCEPTANCE.md)。
 
@@ -31,7 +31,7 @@ npm run test:portable
 npm start
 ```
 
-`test:portable`需要Python 3，仅测试隔离数据库维护与源码指纹，不需要原始数据或NumPy。打开 [工作台](http://127.0.0.1:4311/) 或 [因子实验室](http://127.0.0.1:4311/#factors)。服务固定监听本机回环地址，没有认证，不应公开到互联网。Ctrl+C停止；修改后端代码后重启。端口占用可用：
+`test:portable`需要POSIX环境与Python，覆盖隔离数据库维护、源码指纹、缺数据/异常隔离和工作区切换，不需要原始数据或NumPy；不是完整回测验收。打开 [工作台](http://127.0.0.1:4311/) 或 [因子实验室](http://127.0.0.1:4311/#factors)。服务固定监听本机回环地址，没有认证，不应公开到互联网。Ctrl+C停止；修改后端代码后重启。端口占用可用：
 
 ```sh
 PORT=4322 npm start
@@ -41,7 +41,7 @@ PORT=4322 npm start
 
 ## Python 与数据准备
 
-回测/CSV与Parquet查询依赖Python、NumPy、pandas、PyArrow，验证版本见 [requirements.txt](modules/factors/requirements.txt)。备份和CSV导入使用标准库。新机器可自行在虚拟环境准备依赖；本次交付未自动安装或替换环境：
+回测/CSV与Parquet查询依赖Python、NumPy、pandas、PyArrow，验证版本见 [requirements.txt](modules/factors/requirements.txt)。基金冻结读取要求Python 3.11以上且SQLite提供`Connection.deserialize`；缺能力明确拒绝，不换活动库。CSV导入/备份使用标准库及POSIX `fcntl`，当前仅支持macOS/Linux，未验证Windows。当前实测Python 3.13.5 / SQLite 3.49.1；环境边界见[发布基线](docs/wiki/records/FACTOR-RELEASE-V056.md)。新机器可自行在虚拟环境准备依赖；本次交付未自动安装或替换环境：
 
 ```sh
 python3 -m venv .venv

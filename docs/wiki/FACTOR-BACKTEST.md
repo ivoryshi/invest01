@@ -1,6 +1,6 @@
 # 回测工具与 Skill
 
-v0.5.5 / 因子V0.22。复用已有执行器和snapshot/config/request/result链路，不运行旧脚本，不新增依赖。入口为因子页的回测工具区域、项目内[Skill](../../.agents/skills/factor-backtest/SKILL.md)及本地CLI。Skill随仓库分发，不安装到全局目录。返回[Wiki](README.md) / [因子模块](../../modules/factors/README.md)。
+v0.5.6 / 因子V0.22。复用已有执行器和snapshot/config/request/result链路，不运行旧脚本，不新增依赖。入口为因子页的回测工具区域、项目内[Skill](../../.agents/skills/factor-backtest/SKILL.md)及本地CLI。Skill随仓库分发，不安装到全局目录。运行要求和源码版本见[发布基线](records/FACTOR-RELEASE-V056.md)。返回[Wiki](README.md) / [因子模块](../../modules/factors/README.md)。
 
 ## 支持范围
 
