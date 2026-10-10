@@ -10,7 +10,7 @@
 | 端口占用 | 换PORT，不盲目终止用户其他服务 |
 | 页面仍是旧版 | 重启后端、刷新页面；检查health版本与HTML缓存版本，不只看浏览器旧页 |
 | Python导入失败 | 启动前激活正确环境，检查python3与requirements版本 |
-| 基金查询60秒超时、文件dataless | 数据库可能是系统云盘占位文件，先确认完整保留本机，再复查；本轮首次只读打开519秒。不要放宽回测超时或换数据掩盖I/O问题 |
+| 基金查询60秒超时、文件dataless | 数据库可能是系统云盘占位文件，先确认完整保留本机，再复查；10月9日首次只读打开519秒，10月10日文件落地后名录200/只读23项连续两次通过。云盘回收风险未消除，不放宽回测超时或换数据掩盖I/O问题 |
 | 源文件缺失/422 | 查询assets/profile，按数据说明提供授权源；不要补零价/伪造曲线 |
 | 旧导出503 data_source_unavailable | 缺旧数据的面板单独显示不可用，其余面板继续加载；补授权数据后刷新，不把缺失当零收益 |
 | 500 request_failed | 未预期读取/解析异常，响应不泄露路径或堆栈；停止该操作并核查数据，不自动重试写入 |
@@ -24,7 +24,7 @@
 
 ## 源码发布
 
-远端 [ivoryshi/invest01](https://github.com/ivoryshi/invest01)，发布分支release/factor-migration-v1；历史已核验到v0.5.3，本批v0.5.6含此前尚未发布的v0.5.4/v0.5.5增量及10月6日专用编辑修复。新标签不移动旧标签，最终远端提交与回执见[发布基线](records/FACTOR-RELEASE-V056.md)和[每日记录](records/DAILY.md)。本机旧main含生成研究缓存祖先，保留本地，不merge到发布分支，不上传旧历史，不强推。
+远端 [ivoryshi/invest01](https://github.com/ivoryshi/invest01)，发布分支release/factor-migration-v1；10月10日v0.5.6功能49e658a及发布回执4e850cd已同步核验，v0.5.4/v0.5.5增量也已发布。新标签不移动旧标签，后续文档分支与固定功能标签不同，最终远端提交见[发布基线](records/FACTOR-RELEASE-V056.md)和[每日记录](records/DAILY.md)。本机旧main含生成研究缓存祖先，保留本地，不merge到发布分支，不上传旧历史，不强推。
 
 发布前：
 
